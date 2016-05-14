@@ -7,7 +7,7 @@ LIBS    = -L$(GNUEFI_LIB) -lefi -lgcc
 GNUEFI_INC = /usr/$(CC_PREFIX)/include/efi
 GNUEFI_LIB = /usr/$(CC_PREFIX)/lib
 
-FILES_C = src/main.c src/util.c src/config.c
+FILES_C = src/main.c src/util.c src/types.c src/config.c
 FILES_H = $(wildcard src/*.h)
 
 .PHONY: all

@@ -17,15 +17,6 @@ extern const CHAR16* TmpStr(CHAR8 *src, int length);
 extern UINTN NullPrint(IN CHAR16 *fmt, ...);
 
 /**
- * Calculate the checksum for an ACPI table.
- *
- * @param data Pointer to the table.
- * @param size Table length in bytes.
- * @return Checksum.
- */
-extern UINT8 CalculateAcpiChecksum(void* data, UINTN size);
-
-/**
  * Return the greater of two numbers.
  */
 static inline int max(int a, int b) {

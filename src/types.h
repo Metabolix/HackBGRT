@@ -1,5 +1,7 @@
 #pragma once
 
+#include <efi.h>
+
 #pragma pack(push, 1)
 
 /** RSDP (Root System Description Pointer) */
@@ -51,4 +53,35 @@ typedef struct {
 	UINT16 planes;
 	UINT16 bpp;
 } BMP;
+
+/**
+ * Verify the checksums of an ACPI RSDP version 2.
+ *
+ * @param data Pointer to the table.
+ * @return 1 if the checksum is correct, 0 otherwise.
+ */
+extern int VerifyAcpiRsdp2Checksums(const void* data);
+
+/**
+ * Set the correct checksums of an ACPI RSDP version 2.
+ *
+ * @param data Pointer to the table.
+ */
+extern void SetAcpiRsdp2Checksums(void* data);
+
+/**
+ * Verify the checksum of an ACPI SDT.
+ *
+ * @param data Pointer to the table.
+ * @return 1 if the checksum is correct, 0 otherwise.
+ */
+extern int VerifyAcpiSdtChecksum(const void* data);
+
+/**
+ * Set the correct checksum for an ACPI SDT.
+ *
+ * @param data Pointer to the table.
+ */
+extern void SetAcpiSdtChecksum(void* data);
+
 #pragma pack(pop)

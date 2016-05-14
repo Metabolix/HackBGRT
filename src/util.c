@@ -18,15 +18,6 @@ UINTN NullPrint(IN CHAR16 *fmt, ...) {
 	return 0;
 }
 
-UINT8 CalculateAcpiChecksum(void* data, UINTN size) {
-	UINT8 sum = 0;
-	UINT8* arr = data;
-	for (UINTN i = 0; i < size; ++i) {
-		sum += arr[i];
-	}
-	return 256 - sum;
-}
-
 const CHAR16* TrimLeft(const CHAR16* s) {
 	// Skip white-space and BOM.
 	while (s[0] == L'\xfeff' || s[0] == ' ' || s[0] == '\t') {
