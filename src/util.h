@@ -83,9 +83,16 @@ extern void RandomSeed(UINT64 a, UINT64 b);
 extern void RandomSeedAuto(void);
 
 /**
- * Wait for a key press.
+ * Wait for a key press. It will still remain in the buffer.
  */
 extern void WaitKey(void);
+
+/**
+ * Wait for a key press and read it.
+ *
+ * @return The pressed key.
+ */
+extern EFI_INPUT_KEY ReadKey(void);
 
 /**
  * Load a file, allocate some extra bytes as well.

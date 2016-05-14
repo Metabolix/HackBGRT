@@ -82,6 +82,13 @@ void WaitKey(void) {
 	WaitForSingleEvent(ST->ConIn->WaitForKey, 0);
 }
 
+EFI_INPUT_KEY ReadKey(void) {
+	WaitKey();
+	EFI_INPUT_KEY key = {0};
+	ST->ConIn->ReadKeyStroke(ST->ConIn, &key);
+	return key;
+}
+
 void* LoadFileWithPadding(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* size_ptr, UINTN padding) {
 	EFI_STATUS e;
 	EFI_FILE_HANDLE handle;
