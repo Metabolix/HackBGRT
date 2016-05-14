@@ -96,7 +96,7 @@ static void FillBGRT(ACPI_BGRT* bgrt, BMP* new_bmp, int new_x, int new_y) {
 	Debug(L"HackBGRT: BMP at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
 
 	bgrt->header.checksum = 0;
-	bgrt->header.checksum = CalculateAcpiChecksum(bgrt, sizeof(*bgrt));
+	bgrt->header.checksum = CalculateAcpiChecksum(bgrt, bgrt->header.length);
 }
 
 /**
