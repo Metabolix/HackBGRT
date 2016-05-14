@@ -81,11 +81,11 @@ static void FillBGRT(ACPI_BGRT* bgrt, BMP* new_bmp, int new_x, int new_y) {
 	BMP* bmp = (BMP*) (UINTN) bgrt->image_address;
 
 	// Calculate the automatically centered position for the image.
-	int x_auto, y_auto;
+	int x_auto = 0, y_auto = 0;
 	if (GOP()) {
 		x_auto = max(0, ((int)GOP()->Mode->Info->HorizontalResolution - (int)bmp->width) / 2);
 		y_auto = max(0, ((int)GOP()->Mode->Info->VerticalResolution * 2/3 - (int)bmp->height) / 2);
-	} else {
+	} else if (old_bmp) {
 		x_auto = max(0, (int)bgrt0.image_offset_x + ((int)old_bmp->width - (int)bmp->width) / 2);
 		y_auto = max(0, (int)bgrt0.image_offset_y + ((int)old_bmp->height - (int)bmp->height) / 2);
 	}
