@@ -280,12 +280,18 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 
-	Debug(L"HackBGRT: Loading and booting %s.\n", config.boot_path);
+	Debug(L"HackBGRT: Loading %s.\n", config.boot_path);
 	EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) config.boot_path);
 	EFI_HANDLE next_image_handle;
 	if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
 		Print(L"HackBGRT: LoadImage for new image (%s) failed.\n", config.boot_path);
 		goto fail;
+	}
+	if (config.debug) {
+		Print(L"HackBGRT: Ready to boot.\nPress escape to cancel, any other key to boot.\n");
+		if (ReadKey().ScanCode == SCAN_ESC) {
+			return 0;
+		}
 	}
 	if (EFI_ERROR(BS->StartImage(next_image_handle, 0, 0))) {
 		Print(L"HackBGRT: StartImage for %s failed.\n", config.boot_path);
