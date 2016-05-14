@@ -24,6 +24,13 @@ static inline int max(int a, int b) {
 }
 
 /**
+ * Return the smaller of two numbers.
+ */
+static inline int min(int a, int b) {
+	return a < b ? a : b;
+}
+
+/**
  * Trim BOM, spaces and tabs from the beginning of a string.
  *
  * @param s The string.
