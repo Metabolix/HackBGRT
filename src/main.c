@@ -53,105 +53,77 @@ static int SelectCoordinate(int value, int automatic, int native) {
 }
 
 /**
- * Initialize (clear) a BGRT.
+ * Create a new XSDT with the given number of entries.
  *
- * @param bgrt The BGRT to initialize.
+ * @param xsdt0 The old XSDT.
+ * @param entries The number of SDT entries.
+ * @return Pointer to a new XSDT.
  */
-static void InitBGRT(ACPI_BGRT* bgrt) {
-	const char data[0x38] = "BGRT" "\x38\x00\x00\x00" "\x00" "\xd6" "Mtblx*" "HackBGRT" "\x20\x17\x00\x00" "PTL " "\x02\x00\x00\x00" "\x01\x00" "\x00" "\x00";
-	CopyMem(bgrt, data, sizeof(data));
+ACPI_SDT_HEADER* CreateXsdt(ACPI_SDT_HEADER* xsdt0, UINTN entries) {
+	ACPI_SDT_HEADER* xsdt = 0;
+	UINT32 xsdt_len = sizeof(ACPI_SDT_HEADER) + entries * sizeof(UINT64);
+	BS->AllocatePool(EfiACPIReclaimMemory, xsdt_len, (void**)&xsdt);
+	if (!xsdt) {
+		Print(L"HackBGRT: Failed to allocate memory for XSDT.\n");
+		return 0;
+	}
+	ZeroMem(xsdt, xsdt_len);
+	CopyMem(xsdt, xsdt0, min(xsdt0->length, xsdt_len));
+	xsdt->length = xsdt_len;
+	SetAcpiSdtChecksum(xsdt);
+	return xsdt;
 }
 
 /**
- * Fill a BGRT as specified by the parameters.
+ * Update the ACPI tables as needed for the desired BGRT change.
  *
- * @param bgrt The BGRT to fill.
- * @param new_bmp The BMP to use.
- * @param new_x The x coordinate to use.
- * @param new_y The y coordinate to use.
- */
-static void FillBGRT(ACPI_BGRT* bgrt, BMP* new_bmp, int new_x, int new_y) {
-	BMP* old_bmp = (BMP*) (UINTN) bgrt->image_address;
-	ACPI_BGRT bgrt0 = *bgrt;
-	InitBGRT(bgrt);
-
-	if (new_bmp) {
-		bgrt->image_address = (UINTN) new_bmp;
-	}
-	BMP* bmp = (BMP*) (UINTN) bgrt->image_address;
-
-	// Calculate the automatically centered position for the image.
-	int x_auto = 0, y_auto = 0;
-	if (GOP()) {
-		x_auto = max(0, ((int)GOP()->Mode->Info->HorizontalResolution - (int)bmp->width) / 2);
-		y_auto = max(0, ((int)GOP()->Mode->Info->VerticalResolution * 2/3 - (int)bmp->height) / 2);
-	} else if (old_bmp) {
-		x_auto = max(0, (int)bgrt0.image_offset_x + ((int)old_bmp->width - (int)bmp->width) / 2);
-		y_auto = max(0, (int)bgrt0.image_offset_y + ((int)old_bmp->height - (int)bmp->height) / 2);
-	}
-
-	// Set the position (manual, automatic, original).
-	bgrt->image_offset_x = SelectCoordinate(new_x, x_auto, bgrt0.image_offset_x);
-	bgrt->image_offset_y = SelectCoordinate(new_y, y_auto, bgrt0.image_offset_y);
-	Debug(L"HackBGRT: BMP at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
-
-	SetAcpiSdtChecksum(bgrt);
-}
-
-/**
- * Find the BGRT and optionally destroy it or create if missing.
+ * If action is REMOVE, all BGRT entries will be removed.
+ * If action is KEEP, the first BGRT entry will be returned.
+ * If action is REPLACE, the given BGRT entry will be stored in each XSDT.
  *
  * @param action The intended action.
+ * @param bgrt The BGRT, if action is REPLACE.
  * @return Pointer to the BGRT, or 0 if not found (or destroyed).
  */
-static ACPI_BGRT* FindBGRT(enum HackBGRT_action action) {
-	ACPI_20_RSDP* good_rsdp = 0;
-	ACPI_BGRT* bgrt = 0;
-
+static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt) {
 	for (int i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_GUID Acpi20TableGuid = ACPI_20_TABLE_GUID;
 		EFI_GUID* vendor_guid = &ST->ConfigurationTable[i].VendorGuid;
 		if (!CompareGuid(vendor_guid, &AcpiTableGuid) && !CompareGuid(vendor_guid, &Acpi20TableGuid)) {
 			continue;
 		}
-		EFI_CONFIGURATION_TABLE *ect = &ST->ConfigurationTable[i];
-		if (CompareMem(ect->VendorTable, "RSD PTR ", 8) != 0) {
+		ACPI_20_RSDP* rsdp = (ACPI_20_RSDP *) ST->ConfigurationTable[i].VendorTable;
+		if (CompareMem(rsdp->signature, "RSD PTR ", 8) != 0 || rsdp->revision < 2 || !VerifyAcpiRsdp2Checksums(rsdp)) {
 			continue;
 		}
-		ACPI_20_RSDP* rsdp = (ACPI_20_RSDP *)ect->VendorTable;
 		Debug(L"RSDP: revision = %d, OEM ID = %s\n", rsdp->revision, TmpStr(rsdp->oem_id, 6));
 
-		if (rsdp->revision < 2) {
-			Debug(L"* XSDT: N/A (revision < 2)\n");
-			continue;
-		}
 		ACPI_SDT_HEADER* xsdt = (ACPI_SDT_HEADER *) (UINTN) rsdp->xsdt_address;
-		if (!xsdt) {
-			Debug(L"* XSDT: N/A (null)\n");
+		if (!xsdt || CompareMem(xsdt->signature, "XSDT", 4) != 0 || !VerifyAcpiSdtChecksum(xsdt)) {
+			Debug(L"* XSDT: missing or invalid\n");
 			continue;
 		}
-		if (CompareMem(xsdt->signature, "XSDT", 4) != 0) {
-			Debug(L"* XSDT: N/A (invalid signature)\n");
-			continue;
-		}
-		good_rsdp = rsdp;
 		UINT64* entry_arr = (UINT64*)&xsdt[1];
 		UINT32 entry_arr_length = (xsdt->length - sizeof(*xsdt)) / sizeof(UINT64);
 
 		Debug(L"* XSDT: OEM ID = %s, entry count = %d\n", TmpStr(xsdt->oem_id, 6), entry_arr_length);
 
+		int bgrt_count = 0;
 		for (int j = 0; j < entry_arr_length; j++) {
 			ACPI_SDT_HEADER *entry = (ACPI_SDT_HEADER *)((UINTN)entry_arr[j]);
+			if (CompareMem(entry->signature, "BGRT", 4) != 0) {
+				continue;
+			}
 			Debug(L" - ACPI table: %s, revision = %d, OEM ID = %s\n", TmpStr(entry->signature, 4), entry->revision, TmpStr(entry->oem_id, 6));
-			if (CompareMem(entry->signature, "BGRT", 4) == 0) {
-				if (!bgrt && action != HackBGRT_REMOVE) {
-					bgrt = (void*) entry;
-				} else {
-					if (bgrt) {
-						Debug(L" -> Deleting; BGRT was already found!\n");
-					} else {
-						Debug(L" -> Deleting.\n");
+			switch (action) {
+				case HackBGRT_KEEP:
+					if (!bgrt) {
+						Debug(L" -> Returning this one for later use.\n");
+						bgrt = (ACPI_BGRT*) entry;
 					}
+					break;
+				case HackBGRT_REMOVE:
+					Debug(L" -> Deleting.\n");
 					for (int k = j+1; k < entry_arr_length; ++k) {
 						entry_arr[k-1] = entry_arr[k];
 					}
@@ -159,55 +131,35 @@ static ACPI_BGRT* FindBGRT(enum HackBGRT_action action) {
 					entry_arr[entry_arr_length] = 0;
 					xsdt->length -= sizeof(entry_arr[0]);
 					--j;
-				}
+					break;
+				case HackBGRT_REPLACE:
+					Debug(L" -> Replacing.\n");
+					entry_arr[j] = (UINTN) bgrt;
 			}
+			bgrt_count += 1;
 		}
-	}
-	if (action == HackBGRT_REMOVE) {
-		return 0;
-	}
-	if (!good_rsdp) {
-		Print(L"HackBGRT: RSDP or XSDT not found.\n");
-		return 0;
-	}
-	if (!bgrt) {
-		if (action == HackBGRT_KEEP) {
-			Print(L"HackBGRT: BGRT not found.\n");
-			return 0;
+		if (!bgrt_count && action == HackBGRT_REPLACE && bgrt) {
+			Debug(L" - Adding missing BGRT.\n");
+			xsdt = CreateXsdt(xsdt, entry_arr_length + 1);
+			entry_arr = (UINT64*)&xsdt[1];
+			entry_arr[entry_arr_length++] = (UINTN) bgrt;
+			rsdp->xsdt_address = (UINTN) xsdt;
+			SetAcpiRsdp2Checksums(rsdp);
 		}
-		Debug(L"HackBGRT: BGRT not found, creating.\n");
-		ACPI_20_RSDP* rsdp = good_rsdp;
-		ACPI_SDT_HEADER* xsdt0 = (ACPI_SDT_HEADER *) (UINTN) rsdp->xsdt_address;
-		ACPI_SDT_HEADER* xsdt = 0;
-		UINT32 xsdt_len = xsdt0->length + sizeof(UINT64);
-		BS->AllocatePool(EfiACPIReclaimMemory, xsdt_len, (void**)&xsdt);
-		BS->AllocatePool(EfiACPIReclaimMemory, sizeof(*bgrt), (void**)&bgrt);
-		if (!xsdt || !bgrt) {
-			Print(L"HackBGRT: Failed to allocate memory for XSDT and BGRT.\n");
-			return 0;
-		}
-		rsdp->xsdt_address = (UINTN) xsdt;
-		CopyMem(xsdt, xsdt0, xsdt0->length);
-		*(UINT64*)((char*)xsdt + xsdt->length) = (UINTN) bgrt;
-		xsdt->length = xsdt_len;
-		InitBGRT(bgrt);
+		SetAcpiSdtChecksum(xsdt);
 	}
 	return bgrt;
 }
 
 /**
- * Load a bitmap or generate one, or return 0 if not applicable.
+ * Load a bitmap or generate a black one.
  *
- * @param action Tells what to do.
  * @param root_dir The root directory for loading a BMP.
- * @param path The BMP path within the root directory.
- * @return The loaded BMP, or 0 if not needed or not available.
+ * @param path The BMP path within the root directory; NULL for a black BMP.
+ * @return The loaded BMP, or 0 if not available.
  */
-static BMP* LoadBMP(enum HackBGRT_action action, EFI_FILE_HANDLE root_dir, const CHAR16* path) {
+static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	BMP* bmp = 0;
-	if (action == HackBGRT_KEEP || action == HackBGRT_REMOVE) {
-		return 0;
-	}
 	if (!path) {
 		BS->AllocatePool(EfiBootServicesData, 58, (void**) &bmp);
 		if (!bmp) {
@@ -233,6 +185,85 @@ static BMP* LoadBMP(enum HackBGRT_action action, EFI_FILE_HANDLE root_dir, const
 		return 0;
 	}
 	return bmp;
+}
+
+/**
+ * The main logic for BGRT modification.
+ *
+ * @param root_dir The root directory for loading a BMP.
+ */
+void HackBgrt(EFI_FILE_HANDLE root_dir) {
+	// REMOVE: simply delete all BGRT entries.
+	if (config.action == HackBGRT_REMOVE) {
+		HandleAcpiTables(config.action, 0);
+		return;
+	}
+
+	// KEEP/REPLACE: first get the old BGRT entry.
+	ACPI_BGRT* bgrt = HandleAcpiTables(HackBGRT_KEEP, 0);
+
+	// Get the old BMP and position, if possible.
+	BMP* old_bmp = 0;
+	int old_x = 0, old_y = 0;
+	if (bgrt && VerifyAcpiSdtChecksum(bgrt)) {
+		old_bmp = (BMP*) (UINTN) bgrt->image_address;
+		old_x = bgrt->image_offset_x;
+		old_y = bgrt->image_offset_y;
+	}
+
+	// Missing BGRT?
+	if (!bgrt) {
+		// Keep missing = do nothing.
+		if (config.action == HackBGRT_KEEP) {
+			return;
+		}
+		// Replace missing = allocate new.
+		BS->AllocatePool(EfiACPIReclaimMemory, sizeof(*bgrt), (void**)&bgrt);
+		if (!bgrt) {
+			Print(L"HackBGRT: Failed to allocate memory for BGRT.\n");
+			return;
+		}
+	}
+
+	// Clear the BGRT.
+	const char data[0x38] =
+		"BGRT" "\x38\x00\x00\x00" "\x00" "\xd6" "Mtblx*" "HackBGRT"
+		"\x20\x17\x00\x00" "PTL " "\x02\x00\x00\x00"
+		"\x01\x00" "\x00" "\x00";
+	CopyMem(bgrt, data, sizeof(data));
+
+	// Get the image (either old or new).
+	BMP* new_bmp = old_bmp;
+	if (config.action == HackBGRT_REPLACE) {
+		new_bmp = LoadBMP(root_dir, config.image_path);
+	}
+
+	// No image = no need for BGRT.
+	if (!new_bmp) {
+		HandleAcpiTables(HackBGRT_REMOVE, 0);
+		return;
+	}
+
+	bgrt->image_address = (UINTN) new_bmp;
+
+	// Calculate the automatically centered position for the image.
+	int auto_x = 0, auto_y = 0;
+	if (GOP()) {
+		auto_x = max(0, ((int)GOP()->Mode->Info->HorizontalResolution - (int)new_bmp->width) / 2);
+		auto_y = max(0, ((int)GOP()->Mode->Info->VerticalResolution * 2/3 - (int)new_bmp->height) / 2);
+	} else if (old_bmp) {
+		auto_x = max(0, old_x + ((int)old_bmp->width - (int)new_bmp->width) / 2);
+		auto_y = max(0, old_y + ((int)old_bmp->height - (int)new_bmp->height) / 2);
+	}
+
+	// Set the position (manual, automatic, original).
+	bgrt->image_offset_x = SelectCoordinate(config.image_x, auto_x, old_x);
+	bgrt->image_offset_y = SelectCoordinate(config.image_y, auto_y, old_y);
+	Debug(L"HackBGRT: BMP at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
+
+	// Store this BGRT in the ACPI tables.
+	SetAcpiSdtChecksum(bgrt);
+	HandleAcpiTables(HackBGRT_REPLACE, bgrt);
 }
 
 /**
@@ -264,11 +295,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	}
 	Debug = config.debug ? Print : NullPrint;
 
-	BMP* new_bmp = LoadBMP(config.action, root_dir, config.image_path);
-	ACPI_BGRT* bgrt = FindBGRT(config.action);
-	if (bgrt) {
-		FillBGRT(bgrt, new_bmp, config.image_x, config.image_y);
-	}
+	HackBgrt(root_dir);
 
 	if (!config.boot_path) {
 		Print(L"HackBGRT: Boot path not specified.\n");
