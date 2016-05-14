@@ -296,7 +296,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 
 	fail: {
 		Print(L"HackBGRT has failed. Use parameter debug=1 for details.\nPress any key to exit.\n");
-		WaitKey();
+		ReadKey();
 		return 1;
 	}
 }
