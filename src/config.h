@@ -6,7 +6,7 @@
  * Possible actions to perform on the BGRT.
  */
 enum HackBGRT_action {
-	HackBGRT_KEEP = 0, HackBGRT_REPLACE, HackBGRT_REMOVE, HackBGRT_BLACK
+	HackBGRT_KEEP = 0, HackBGRT_REPLACE, HackBGRT_REMOVE
 };
 
 /**

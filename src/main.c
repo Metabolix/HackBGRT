@@ -209,7 +209,7 @@ static BMP* LoadBMP(enum HackBGRT_action action, EFI_FILE_HANDLE root_dir, const
 	if (action == HackBGRT_KEEP || action == HackBGRT_REMOVE) {
 		return 0;
 	}
-	if (action == HackBGRT_BLACK) {
+	if (!path) {
 		BS->AllocatePool(EfiBootServicesData, 58, (void**) &bmp);
 		if (!bmp) {
 			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
@@ -225,10 +225,6 @@ static BMP* LoadBMP(enum HackBGRT_action action, EFI_FILE_HANDLE root_dir, const
 			58
 		);
 		return bmp;
-	}
-	if (!path) {
-		Print(L"HackBGRT: Missing BMP path. REPORT THIS BUG!");
-		return 0;
 	}
 	Debug(L"HackBGRT: Loading %s.\n", path);
 	bmp = LoadFile(root_dir, path, 0);

@@ -65,7 +65,7 @@ static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) 
 	} else if (StrStr(line, L"remove")) {
 		action = HackBGRT_REMOVE;
 	} else if (StrStr(line, L"black")) {
-		action = HackBGRT_BLACK;
+		action = HackBGRT_REPLACE;
 	} else if (StrStr(line, L"keep")) {
 		action = HackBGRT_KEEP;
 	} else {
