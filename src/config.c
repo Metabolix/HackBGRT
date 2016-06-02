@@ -76,6 +76,17 @@ static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) 
 	SetBMPWithRandom(config, weight, action, ParseCoordinate(x, action), ParseCoordinate(y, action), f);
 }
 
+static void ReadConfigResolution(struct HackBGRT_config* config, const CHAR16* line) {
+	const CHAR16* x = line;
+	const CHAR16* y = StrStrAfter(line, L"x");
+	if (x && *x && y && *y) {
+		config->resolution_x = *x == '-' ? -(int)Atoi(x+1) : (int)Atoi(x);
+		config->resolution_y = *y == '-' ? -(int)Atoi(y+1) : (int)Atoi(y);
+	} else {
+		Print(L"HackBGRT: Invalid resolution line: %s\n", line);
+	}
+}
+
 void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* line) {
 	line = TrimLeft(line);
 	if (line[0] == L'#' || line[0] == 0) {
@@ -96,6 +107,10 @@ void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, co
 	}
 	if (StrnCmp(line, L"config=", 7) == 0) {
 		ReadConfigFile(config, root_dir, line + 7);
+		return;
+	}
+	if (StrnCmp(line, L"resolution=", 11) == 0) {
+		ReadConfigResolution(config, line + 11);
 		return;
 	}
 	Print(L"Unknown configuration directive: %s\n", line);

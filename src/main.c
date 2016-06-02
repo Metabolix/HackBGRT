@@ -35,6 +35,63 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP(void) {
 }
 
 /**
+ * Set screen resolution. If there is no exact match, try to find a bigger one.
+ *
+ * @param w Horizontal resolution. 0 for max, -1 for current.
+ * @param h Vertical resolution. 0 for max, -1 for current.
+ */
+static void SetResolution(int w, int h) {
+	EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = GOP();
+	if (!gop) {
+		Debug(L"GOP not found!\n");
+		return;
+	}
+	UINTN best_i = gop->Mode->Mode;
+	int best_w = gop->Mode->Info->HorizontalResolution;
+	int best_h = gop->Mode->Info->VerticalResolution;
+	w = (w <= 0 ? w < 0 ? best_w : 0x7fffffff : w);
+	h = (h <= 0 ? h < 0 ? best_h : 0x7fffffff : h);
+
+	Debug(L"Looking for resolution %dx%d...\n", w, h);
+	for (UINT32 i = gop->Mode->MaxMode; i--;) {
+		int new_w = 0, new_h = 0;
+
+		EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* info = 0;
+		UINTN info_size;
+		if (EFI_ERROR(gop->QueryMode(gop, i, &info_size, &info))) {
+			continue;
+		}
+		if (info_size < sizeof(*info)) {
+			FreePool(info);
+			continue;
+		}
+		new_w = info->HorizontalResolution;
+		new_h = info->VerticalResolution;
+		FreePool(info);
+
+		// Sum of missing w/h should be minimal.
+		int new_missing = max(w - new_w, 0) + max(h - new_h, 0);
+		int best_missing = max(w - best_w, 0) + max(h - best_h, 0);
+		if (new_missing > best_missing) {
+			continue;
+		}
+		// Sum of extra w/h should be minimal.
+		int new_over = max(-w + new_w, 0) + max(-h + new_h, 0);
+		int best_over = max(-w + best_w, 0) + max(-h + best_h, 0);
+		if (new_missing == best_missing && new_over >= best_over) {
+			continue;
+		}
+		best_w = new_w;
+		best_h = new_h;
+		best_i = i;
+	}
+	Debug(L"Found resolution %dx%d.\n", best_w, best_h);
+	if (best_i != gop->Mode->Mode) {
+		gop->SetMode(gop, best_i);
+	}
+}
+
+/**
  * Select the correct coordinate (manual, automatic, native)
  *
  * @param value The configured coordinate value; has special values for automatic and native.
@@ -295,6 +352,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	}
 	Debug = config.debug ? Print : NullPrint;
 
+	SetResolution(config.resolution_x, config.resolution_y);
 	HackBgrt(root_dir);
 
 	if (!config.boot_path) {

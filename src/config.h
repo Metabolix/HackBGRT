@@ -28,6 +28,8 @@ struct HackBGRT_config {
 	int image_x;
 	int image_y;
 	int image_weight_sum;
+	int resolution_x;
+	int resolution_y;
 	const CHAR16* boot_path;
 };
 
