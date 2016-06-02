@@ -10,8 +10,10 @@ GNUEFI_LIB = /usr/$(CC_PREFIX)/lib
 FILES_C = src/main.c src/util.c src/types.c src/config.c
 FILES_H = $(wildcard src/*.h)
 
-.PHONY: all
-all: bootx64.efi
+.PHONY: all default
+
+default: bootx64.efi
+all: bootx64.efi bootia32.efi
 
 bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
 bootx64.efi: GNUEFI_ARCH = x86_64
@@ -23,5 +25,5 @@ bootia32.efi: GNUEFI_ARCH = ia32
 bootia32.efi: $(FILES_C)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -s
 
-HackBGRT.tar.xz: bootx64.efi config.txt splash.bmp install.bat uninstall.bat README.md README.efilib LICENSE
+HackBGRT.tar.xz: bootx64.efi bootia32.efi config.txt splash.bmp install.bat uninstall.bat README.md README.efilib LICENSE
 	tar cJf $@ --transform=s,^,HackBGRT/, $^
