@@ -381,7 +381,13 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	goto fail;
 
 	fail: {
-		Print(L"HackBGRT has failed. Use parameter debug=1 for details.\nPress any key to exit.\n");
+		Print(L"HackBGRT has failed. Use parameter debug=1 for details.\n");
+		#ifdef GIT_DESCRIBE
+			Print(L"HackBGRT version: " GIT_DESCRIBE L"\n");
+		#else
+			Print(L"HackBGRT version: unknown; not an official release?\n");
+		#endif
+		Print(L"Press any key to exit.\n");
 		ReadKey();
 		return 1;
 	}
