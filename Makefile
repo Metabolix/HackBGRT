@@ -17,8 +17,11 @@ CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
 default: bootx64.efi
 all: bootx64.efi bootia32.efi setup.exe
 
-setup.exe: src/Setup.cs
-	mcs -out:$@ $^
+src/GIT_DESCRIBE.cs: src/Setup.cs $(FILES_C) $(FILES_H)
+	echo 'public class GIT_DESCRIBE { public static string data = "$(GIT_DESCRIBE)"; }' > $@
+
+setup.exe: src/Setup.cs src/GIT_DESCRIBE.cs
+	mcs -define:GIT_DESCRIBE -out:$@ $^
 
 bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
 bootx64.efi: GNUEFI_ARCH = x86_64

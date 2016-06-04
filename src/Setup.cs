@@ -364,6 +364,11 @@ public class Setup {
 	 * @param args The arguments.
 	 */
 	public static void Main(string[] args) {
+		#if GIT_DESCRIBE
+			Console.WriteLine("HackBGRT installer version: {0}", GIT_DESCRIBE.data);
+		#else
+			Console.WriteLine("HackBGRT installer version: unknown; not an official release?");
+		#endif
 		var self = Assembly.GetExecutingAssembly().Location;
 		try {
 			// Relaunch as admin, if needed.
