@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Linq;
+using System.Security.Principal;
 
 /**
  * HackBGRT Setup.
@@ -363,6 +365,28 @@ public class Setup {
 	 */
 	public static void Main(string[] args) {
 		var self = Assembly.GetExecutingAssembly().Location;
+		try {
+			// Relaunch as admin, if needed.
+			var id = WindowsIdentity.GetCurrent();
+			var principal = new WindowsPrincipal(id);
+			var admin = WindowsBuiltInRole.Administrator;
+			if (!principal.IsInRole(admin) && !args.Contains("no-elevate")) {
+				ProcessStartInfo startInfo = new ProcessStartInfo(self);
+				startInfo.Arguments = "no-elevate";
+				startInfo.Verb = "runas";
+				startInfo.UseShellExecute = true;
+				Process p = Process.Start(startInfo);
+				p.WaitForExit();
+				Environment.ExitCode = p.ExitCode;
+				return;
+			}
+		} catch {
+			Console.WriteLine("This installer needs to be run as administrator!");
+			Console.WriteLine("Press any key to quit.");
+			Console.ReadKey();
+			Environment.ExitCode = 1;
+			return;
+		}
 		RunSetup(Path.GetDirectoryName(self));
 		Console.WriteLine("Press any key to quit.");
 		Console.ReadKey();
