@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 - 2016-12-22
+
+### Added
+- Check Secure Boot status before installing.
+
 ## 1.2.0 - 2016-06-05
 
 ### Added
