@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Linq;
 using System.Security.Principal;
+using Microsoft.Win32;
 
 /**
  * HackBGRT Setup.
@@ -190,7 +191,6 @@ public class Setup {
 			throw new SetupException("Couldn't install the new bootmgfw.efi.");
 		}
 		Console.WriteLine("HackBGRT is now enabled.");
-		Console.WriteLine("Remember to disable Secure Boot, or HackBGRT will not boot.");
 	}
 
 	/**
@@ -264,6 +264,38 @@ public class Setup {
 		ESP esp = new ESP();
 		try {
 			esp.Mount();
+			int secureBoot = -1;
+			try {
+				secureBoot = (int) Registry.GetValue(
+					"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State",
+					"UEFISecureBootEnabled",
+					-1
+				);
+			} catch (Exception) {
+			}
+			if (secureBoot != 0) {
+				if (secureBoot == 1) {
+					Console.WriteLine("Secure Boot is enabled.");
+					Console.WriteLine("HackBGRT doesn't work with Secure Boot.");
+					Console.WriteLine("If you install HackBGRT, your machine may become unbootable,");
+					Console.WriteLine("unless you manually disable Secure Boot.");
+				} else {
+					Console.WriteLine("Could not determine Secure Boot status.");
+					Console.WriteLine("Your system may be incompatible with HackBGRT.");
+					Console.WriteLine("If you install HackBGRT, your machine may become unbootable.");
+				}
+				Console.WriteLine("Do you still wish to continue? [Y/N]");
+				var k = Console.ReadKey().Key;
+				Console.WriteLine();
+				if (k == ConsoleKey.Y) {
+					Console.WriteLine("Continuing. THIS IS DANGEROUS!");
+				} else if (k == ConsoleKey.N) {
+					Console.WriteLine("Aborting.");
+					return;
+				} else {
+					throw new SetupException("Invalid choice!");
+				}
+			}
 			string hackbgrt = esp.Path + "\\EFI\\HackBGRT";
 			string msloader = esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
 			if (!Directory.Exists(hackbgrt)) {
