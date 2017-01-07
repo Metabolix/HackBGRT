@@ -9,7 +9,7 @@ GNUEFI_LIB = /usr/$(CC_PREFIX)/lib
 
 FILES_C = src/main.c src/util.c src/types.c src/config.c
 FILES_H = $(wildcard src/*.h)
-GIT_DESCRIBE = $(shell git describe --tags)
+GIT_DESCRIBE = $(firstword $(shell git describe --tags) unknown)
 CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
 
 efi: bootx64.efi bootia32.efi
