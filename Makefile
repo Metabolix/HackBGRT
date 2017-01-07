@@ -11,10 +11,20 @@ FILES_C = src/main.c src/util.c src/types.c src/config.c
 FILES_H = $(wildcard src/*.h)
 GIT_DESCRIBE = $(firstword $(shell git describe --tags) unknown)
 CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
+ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
+ZIP = $(ZIPDIR).zip
 
 efi: bootx64.efi bootia32.efi
 setup: setup.exe
 all: efi setup
+
+zip: $(ZIP)
+$(ZIP): bootx64.efi bootia32.efi config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE
+	test ! -d "$(ZIPDIR)"
+	mkdir "$(ZIPDIR)"
+	cp -a $^ "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
+	7z a -mx=9 "$(ZIP)" "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
+	rm -rf "$(ZIPDIR)"
 
 src/GIT_DESCRIBE.cs: src/Setup.cs $(FILES_C) $(FILES_H)
 	echo 'public class GIT_DESCRIBE { public static string data = "$(GIT_DESCRIBE)"; }' > $@
@@ -31,6 +41,3 @@ bootia32.efi: CC_PREFIX = i686-w64-mingw32
 bootia32.efi: GNUEFI_ARCH = ia32
 bootia32.efi: $(FILES_C)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -s
-
-HackBGRT.tar.xz: bootx64.efi bootia32.efi config.txt splash.bmp setup.exe README.md README.efilib LICENSE
-	tar cJf $@ --transform=s,^,HackBGRT/, $^
