@@ -12,10 +12,9 @@ FILES_H = $(wildcard src/*.h)
 GIT_DESCRIBE = $(shell git describe --tags)
 CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
 
-.PHONY: all default
-
-default: bootx64.efi
-all: bootx64.efi bootia32.efi setup.exe
+efi: bootx64.efi bootia32.efi
+setup: setup.exe
+all: efi setup
 
 src/GIT_DESCRIBE.cs: src/Setup.cs $(FILES_C) $(FILES_H)
 	echo 'public class GIT_DESCRIBE { public static string data = "$(GIT_DESCRIBE)"; }' > $@
