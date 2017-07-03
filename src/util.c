@@ -100,7 +100,9 @@ void* LoadFileWithPadding(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* size_p
 		return 0;
 	}
 	e = handle->Read(handle, &size, data);
-	*(UINT32*)((char*)data + size) = 0;
+	for (int i = 0; i < padding; ++i) {
+		*((char*)data + size + i) = 0;
+	}
 	handle->Close(handle);
 	if (EFI_ERROR(e)) {
 		FreePool(data);
