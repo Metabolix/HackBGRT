@@ -4,14 +4,55 @@
 #include <efilib.h>
 
 BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* path) {
-	CHAR16* str = 0;
-	UINTN str_bytes = 0;
-	str = LoadFileWithPadding(root_dir, path, &str_bytes, sizeof(*str));
-	if (!str) {
+	void* data = 0;
+	UINTN data_bytes = 0;
+	data = LoadFileWithPadding(root_dir, path, &data_bytes, 4);
+	if (!data) {
 		Print(L"HackBGRT: Failed to load configuration (%s)!\n", path);
 		return FALSE;
 	}
-	UINTN str_len = str_bytes / sizeof(*str);
+	CHAR16* str;
+	UINTN str_len;
+	if (*(CHAR16*)data == 0xfeff) {
+		// UCS-2
+		str = data;
+		str_len = data_bytes / sizeof(*str);
+	} else {
+		// UTF-8 -> UCS-2
+		EFI_STATUS e = BS->AllocatePool(EfiBootServicesData, data_bytes * 2 + 2, (void**)&str);
+		if (EFI_ERROR(e)) {
+			FreePool(data);
+			return FALSE;
+		}
+		UINT8* str0 = data;
+		for (UINTN i = str_len = 0; i < data_bytes;) {
+			UINTN unicode = 0xfffd;
+			if (str0[i] < 0x80) {
+				unicode = str0[i];
+				i += 1;
+			} else if (str0[i] < 0xc0) {
+				i += 1;
+			} else if (str0[i] < 0xe0) {
+				unicode = ((str0[i] & 0x1f) << 6) | ((str0[i+1] & 0x3f) << 0);
+				i += 2;
+			} else if (str0[i] < 0xf0) {
+				unicode = ((str0[i] & 0x0f) << 12) | ((str0[i+1] & 0x3f) << 6) | ((str0[i+2] & 0x3f) << 0);
+				i += 3;
+			} else if (str0[i] < 0xf8) {
+				unicode = ((str0[i] & 0x07) << 18) | ((str0[i+1] & 0x3f) << 12) | ((str0[i+2] & 0x3f) << 6) | ((str0[i+3] & 0x3f) << 0);
+				i += 4;
+			} else {
+				i += 1;
+			}
+			if (unicode <= 0xffff) {
+				str[str_len++] = unicode;
+			} else {
+				str[str_len++] = 0xfffd;
+			}
+		}
+		str[str_len] = 0;
+		FreePool(data);
+	}
 
 	for (int i = 0; i < str_len;) {
 		int j = i;
