@@ -44,6 +44,13 @@ The image must be a 24-bit BMP file with a 54-byte header. That's a TrueColor BM
 
 Multiple images may be specified, in which case one is picked at random.
 
+## Recovery
+
+If something breaks and you can't boot to Windows, you have the following options:
+
+* Windows installation (or recovery) media can fix boot issues.
+* You can copy `[EFI System Partition]\EFI\HackBGRT\bootmgfw-original.efi` into `[EFI System Partition]\EFI\Microsoft\Boot\bootmgfw.efi` by some other means such as Linux or Windows command prompt.
+
 ## Building
 
 * Compiler: GCC targeting w64-mingw32
