@@ -355,17 +355,30 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	SetResolution(config.resolution_x, config.resolution_y);
 	HackBgrt(root_dir);
 
+	EFI_HANDLE next_image_handle = 0;
 	if (!config.boot_path) {
 		Print(L"HackBGRT: Boot path not specified.\n");
-		goto fail;
+	} else {
+		Debug(L"HackBGRT: Loading application %s.\n", config.boot_path);
+		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) config.boot_path);
+		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
+			Print(L"HackBGRT: Failed to load application %s.\n", config.boot_path);
+		}
 	}
-
-	Debug(L"HackBGRT: Loading %s.\n", config.boot_path);
-	EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) config.boot_path);
-	EFI_HANDLE next_image_handle;
-	if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-		Print(L"HackBGRT: LoadImage for new image (%s) failed.\n", config.boot_path);
-		goto fail;
+	if (!next_image_handle) {
+		static CHAR16 default_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";
+		Debug(L"HackBGRT: Loading application %s.\n", default_boot_path);
+		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, default_boot_path);
+		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
+			Print(L"HackBGRT: Also failed to load application %s.\n", default_boot_path);
+			goto fail;
+		}
+		Print(L"HackBGRT: Reverting to %s.\n", default_boot_path);
+		Print(L"Press escape to cancel, any other key to boot.\n");
+		if (ReadKey().ScanCode == SCAN_ESC) {
+			goto fail;
+		}
+		config.boot_path = default_boot_path;
 	}
 	if (config.debug) {
 		Print(L"HackBGRT: Ready to boot.\nPress escape to cancel, any other key to boot.\n");
@@ -374,7 +387,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		}
 	}
 	if (EFI_ERROR(BS->StartImage(next_image_handle, 0, 0))) {
-		Print(L"HackBGRT: StartImage for %s failed.\n", config.boot_path);
+		Print(L"HackBGRT: Failed to start %s.\n", config.boot_path);
 		goto fail;
 	}
 	Print(L"HackBGRT: Started %s. Why are we still here?!\n", config.boot_path);
@@ -382,6 +395,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 
 	fail: {
 		Print(L"HackBGRT has failed. Use parameter debug=1 for details.\n");
+		Print(L"Get a Windows install disk or a recovery disk to fix your boot.\n");
 		#ifdef GIT_DESCRIBE
 			Print(L"HackBGRT version: " GIT_DESCRIBE L"\n");
 		#else
