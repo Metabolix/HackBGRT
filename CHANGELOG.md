@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.4.0 - 2017-08-29
+
+### Added
+- Use UTF-8 in the configuration file.
+- Use the default boot loader path if the configured one doesn't work.
+
 ## 1.3.0 - 2016-12-22
 
 ### Added
