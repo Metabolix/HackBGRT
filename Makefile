@@ -9,6 +9,7 @@ GNUEFI_LIB = /usr/$(CC_PREFIX)/lib
 
 FILES_C = src/main.c src/util.c src/types.c src/config.c
 FILES_H = $(wildcard src/*.h)
+FILES_CS = src/Setup.cs
 GIT_DESCRIBE = $(firstword $(shell git describe --tags) unknown)
 CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
@@ -26,10 +27,10 @@ $(ZIP): bootx64.efi bootia32.efi config.txt splash.bmp setup.exe README.md CHANG
 	7z a -mx=9 "$(ZIP)" "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
 	rm -rf "$(ZIPDIR)"
 
-src/GIT_DESCRIBE.cs: src/Setup.cs $(FILES_C) $(FILES_H)
+src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
 	echo 'public class GIT_DESCRIBE { public static string data = "$(GIT_DESCRIBE)"; }' > $@
 
-setup.exe: src/Setup.cs src/GIT_DESCRIBE.cs
+setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
 	mcs -define:GIT_DESCRIBE -out:$@ $^
 
 bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
