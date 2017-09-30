@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.5.0 - 2017-09-30
+
+### Added
+- Support for rebooting to UEFI setup.
+
+### Changed
+- Minor enhancements to installer.
+
 ## 1.4.0 - 2017-08-29
 
 ### Added
