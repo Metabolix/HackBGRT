@@ -253,6 +253,52 @@ public class Setup: SetupHelper {
 	}
 
 	/**
+	 * Check Secure Boot status and inform the user.
+	 */
+	public static void HandleSecureBoot() {
+		int secureBoot = EfiGetSecureBootStatus();
+		if (secureBoot == 0) {
+			Console.WriteLine("Secure Boot is disabled, good!");
+		} else {
+			if (secureBoot == 1) {
+				Console.WriteLine("Secure Boot is probably enabled.");
+			} else {
+				Console.WriteLine("Secure Boot status could not be determined.");
+			}
+			Console.WriteLine("It's very important to disable Secure Boot before installing.");
+			Console.WriteLine("Otherwise your machine may become unbootable.");
+			Console.WriteLine("Choose action (press a key):");
+			Console.WriteLine(" I = Install anyway; THIS MAY BE DANGEROUS!");
+			Console.WriteLine(" C = Cancel");
+			var k = Console.ReadKey().Key;
+			Console.WriteLine();
+			if (k == ConsoleKey.I) {
+				Console.WriteLine("Continuing. THIS MAY BE DANGEROUS!");
+			} else {
+				Console.WriteLine("Aborting because of Secure Boot.");
+				throw new ExitSetup(1);
+			}
+		}
+	}
+
+	/**
+	 * Check if Secure Boot is enabled.
+	 *
+	 * @return 0 for disabled, 1 for enabled, other for unknown.
+	 */
+	public static int EfiGetSecureBootStatus() {
+		try {
+			return (int) Registry.GetValue(
+				"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State",
+				"UEFISecureBootEnabled",
+				-1
+			);
+		} catch (Exception) {
+			return -1;
+		}
+	}
+
+	/**
 	 * Run the setup.
 	 *
 	 * @param src Path to the installation files.
@@ -260,38 +306,8 @@ public class Setup: SetupHelper {
 	public static void RunSetup(string src) {
 		try {
 			InitEspPath();
-			int secureBoot = -1;
-			try {
-				secureBoot = (int) Registry.GetValue(
-					"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State",
-					"UEFISecureBootEnabled",
-					-1
-				);
-			} catch (Exception) {
-			}
-			if (secureBoot != 0) {
-				if (secureBoot == 1) {
-					Console.WriteLine("Secure Boot is enabled.");
-					Console.WriteLine("HackBGRT doesn't work with Secure Boot.");
-					Console.WriteLine("If you install HackBGRT, your machine may become unbootable,");
-					Console.WriteLine("unless you manually disable Secure Boot.");
-				} else {
-					Console.WriteLine("Could not determine Secure Boot status.");
-					Console.WriteLine("Your system may be incompatible with HackBGRT.");
-					Console.WriteLine("If you install HackBGRT, your machine may become unbootable.");
-				}
-				Console.WriteLine("Do you still wish to continue? [Y/N]");
-				var k = Console.ReadKey().Key;
-				Console.WriteLine();
-				if (k == ConsoleKey.Y) {
-					Console.WriteLine("Continuing. THIS IS DANGEROUS!");
-				} else if (k == ConsoleKey.N) {
-					Console.WriteLine("Aborting.");
-					return;
-				} else {
-					throw new SetupException("Invalid choice!");
-				}
-			}
+			HandleSecureBoot();
+
 			string hackbgrt = Esp.Path + "\\EFI\\HackBGRT";
 			BootLoaderInfo msloader = new BootLoaderInfo(Esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
 			if (!Directory.Exists(hackbgrt)) {
