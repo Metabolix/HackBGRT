@@ -1,16 +1,12 @@
 using System;
-using System.Reflection;
-using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Linq;
-using System.Security.Principal;
 using Microsoft.Win32;
 
 /**
  * HackBGRT Setup.
  */
-public class Setup {
+public class Setup: SetupHelper {
 	/**
 	 * The custom exception class for expected exceptions.
 	 */
@@ -131,7 +127,7 @@ public class Setup {
 				Console.WriteLine(msloader + " already contains a version of HackBGRT, skipping backup.");
 			} else if (info.Type == BootLoaderType.MS) {
 				// Overwrite any previous backup, the file might have changed.
-				Copy(msloader, hackbgrt + "\\bootmgfw-original.efi");
+				SetupHelper.Copy(msloader, hackbgrt + "\\bootmgfw-original.efi");
 			} else {
 				Console.WriteLine(msloader + " doesn't look right, skipping backup.");
 			}
@@ -186,8 +182,8 @@ public class Setup {
 		if (!File.Exists(loaderInst)) {
 			throw new SetupException(loaderInst + " doesn't exist.");
 		}
-		if (!Copy(loaderInst, msloader)) {
-			Copy(msbackup.Path, msloader);
+		if (!SetupHelper.Copy(loaderInst, msloader)) {
+			SetupHelper.Copy(msbackup.Path, msloader);
 			throw new SetupException("Couldn't install the new bootmgfw.efi.");
 		}
 		Console.WriteLine("HackBGRT is now enabled.");
@@ -232,7 +228,7 @@ public class Setup {
 			if (!File.Exists(hackbgrt + "\\bootmgfw-original.efi")) {
 				throw new SetupException("Missing the original bootmgfw.efi.");
 			}
-			if (!Copy(hackbgrt + "\\bootmgfw-original.efi", msloader)) {
+			if (!SetupHelper.Copy(hackbgrt + "\\bootmgfw-original.efi", msloader)) {
 				throw new SetupException("Failed to restore the original bootmgfw.efi.");
 			}
 			Console.WriteLine(msloader + " has been restored.");
@@ -260,7 +256,7 @@ public class Setup {
 	 *
 	 * @param src Path to the installation files.
 	 */
-	protected static void RunSetup(string src) {
+	public static void RunSetup(string src) {
 		ESP esp = new ESP();
 		try {
 			esp.Mount();
@@ -333,98 +329,6 @@ public class Setup {
 		} finally {
 			esp.Unmount();
 		}
-	}
-
-	/**
-	 * Start another process.
-	 *
-	 * @param app Path to the application.
-	 * @param args The argument string.
-	 * @return The started process.
-	 */
-	protected static Process StartProcess(string app, string args) {
-		try {
-			var info = new ProcessStartInfo(app, args);
-			info.UseShellExecute = false;
-			return Process.Start(info);
-		} catch {
-			return null;
-		}
-	}
-
-	/**
-	 * Execute another process, return the output.
-	 *
-	 * @param app Path to the application.
-	 * @param args The argument string.
-	 * @param nullOnFail If set, return null if the program exits with a code other than 0, even if there was some output.
-	 * @return The output, or null if the execution failed.
-	 */
-	protected static string Execute(string app, string args, bool nullOnFail) {
-		try {
-			var info = new ProcessStartInfo(app, args);
-			info.UseShellExecute = false;
-			info.RedirectStandardOutput = true;
-			var p = Process.Start(info);
-			string output = p.StandardOutput.ReadToEnd();
-			p.WaitForExit();
-			return (nullOnFail && p.ExitCode != 0) ? null : output;
-		} catch {
-			return null;
-		}
-	}
-
-	/**
-	 * Copy a file, overwrite by default.
-	 *
-	 * @param src The source path.
-	 * @param dest The destination path.
-	 * @return True, if the file was successfully copied.
-	 */
-	public static bool Copy(string src, string dest) {
-		try {
-			File.Copy(src, dest, true);
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
-	/**
-	 * The Main program.
-	 *
-	 * @param args The arguments.
-	 */
-	public static void Main(string[] args) {
-		#if GIT_DESCRIBE
-			Console.WriteLine("HackBGRT installer version: {0}", GIT_DESCRIBE.data);
-		#else
-			Console.WriteLine("HackBGRT installer version: unknown; not an official release?");
-		#endif
-		var self = Assembly.GetExecutingAssembly().Location;
-		try {
-			// Relaunch as admin, if needed.
-			var id = WindowsIdentity.GetCurrent();
-			var principal = new WindowsPrincipal(id);
-			var admin = WindowsBuiltInRole.Administrator;
-			if (!principal.IsInRole(admin) && !args.Contains("no-elevate")) {
-				ProcessStartInfo startInfo = new ProcessStartInfo(self);
-				startInfo.Arguments = "no-elevate";
-				startInfo.Verb = "runas";
-				startInfo.UseShellExecute = true;
-				Process p = Process.Start(startInfo);
-				p.WaitForExit();
-				Environment.ExitCode = p.ExitCode;
-				return;
-			}
-		} catch {
-			Console.WriteLine("This installer needs to be run as administrator!");
-			Console.WriteLine("Press any key to quit.");
-			Console.ReadKey();
-			Environment.ExitCode = 1;
-			return;
-		}
-		RunSetup(Path.GetDirectoryName(self));
 		Console.WriteLine("Press any key to quit.");
 		Console.ReadKey();
 	}
