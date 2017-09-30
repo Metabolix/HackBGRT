@@ -15,6 +15,16 @@ public class Setup: SetupHelper {
 	}
 
 	/**
+	 * A custom exception class for simply exiting the application.
+	 */
+	public class ExitSetup: Exception {
+		public readonly int Code;
+		public ExitSetup(int code) {
+			Code = code;
+		}
+	}
+
+	/**
 	 * Find or mount or manually choose the EFI System Partition.
 	 */
 	public static void InitEspPath() {
@@ -309,6 +319,8 @@ public class Setup: SetupHelper {
 					throw new SetupException("Invalid choice!");
 				}
 			}
+		} catch (ExitSetup e) {
+			Environment.ExitCode = e.Code;
 		} catch (SetupException e) {
 			Console.WriteLine("Error: {0}", e.Message);
 			Environment.ExitCode = 1;
