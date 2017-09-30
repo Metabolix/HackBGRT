@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 /**
@@ -16,47 +15,22 @@ public class Setup: SetupHelper {
 	}
 
 	/**
-	 * EFI System Partition mounter.
+	 * Find or mount or manually choose the EFI System Partition.
 	 */
-	public class ESP {
-		/** EFI System Partition mount point. */
-		public string Path = null;
-
-		/** Was the ESP mounted by this instance? */
-		private bool Mounted = false;
-
-		/**
-		 * Mount the EFI System Partition, or determine an existing mount point.
-		 */
-		public void Mount() {
-			try {
-				// Match "The EFI System Partition is mounted at E:\" with some language support.
-				var re = new Regex(" EFI[^\n]*(?:\n[ \t]*)?([A-Z]:)\\\\");
-				Path = re.Match(Execute("mountvol", "", false)).Groups[1].Captures[0].Value;
-				return;
-			} catch {
+	public static void InitEspPath() {
+		if (!Esp.Find() && !Esp.Mount()) {
+			Console.WriteLine("EFI System Partition was not found.");
+			Console.WriteLine("Press enter to exit, or give ESP path here: ");
+			string s = Console.ReadLine();
+			if (s.Length == 1) {
+				s = s + ":";
 			}
-			// Try to mount somewhere.
-			for (char c = 'A'; c <= 'Z'; ++c) {
-				if (Execute("mountvol", c + ": /S", true) != null) {
-					Console.WriteLine("The EFI System Partition is mounted in " + c + ":\\");
-					Path = c + ":";
-					Mounted = true;
-					return;
-				}
+			if (!Esp.TryPath(s, true)) {
+				Console.WriteLine("That's not a valid ESP path!");
 			}
-			throw new SetupException("The EFI System Partition is not mounted.");
 		}
-
-		/**
-		 * Unmount the EFI System Partition, if it was previously mounted by this instance.
-		 */
-		public void Unmount() {
-			if (Mounted) {
-				Execute("mountvol", Path + " /D", true);
-				Mounted = false;
-				Path = null;
-			}
+		if (Esp.Path == null) {
+			throw new SetupException("EFI System Partition was not found.");
 		}
 	}
 
@@ -274,9 +248,8 @@ public class Setup: SetupHelper {
 	 * @param src Path to the installation files.
 	 */
 	public static void RunSetup(string src) {
-		ESP esp = new ESP();
 		try {
-			esp.Mount();
+			InitEspPath();
 			int secureBoot = -1;
 			try {
 				secureBoot = (int) Registry.GetValue(
@@ -309,8 +282,8 @@ public class Setup: SetupHelper {
 					throw new SetupException("Invalid choice!");
 				}
 			}
-			string hackbgrt = esp.Path + "\\EFI\\HackBGRT";
-			BootLoaderInfo msloader = new BootLoaderInfo(esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
+			string hackbgrt = Esp.Path + "\\EFI\\HackBGRT";
+			BootLoaderInfo msloader = new BootLoaderInfo(Esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
 			if (!Directory.Exists(hackbgrt)) {
 				Install(src, hackbgrt, msloader, Backup(hackbgrt, msloader));
 			} else {
@@ -343,8 +316,6 @@ public class Setup: SetupHelper {
 			Console.WriteLine("Unexpected error!\n{0}", e.ToString());
 			Console.WriteLine("If this is the most current release, please report this bug.");
 			Environment.ExitCode = 1;
-		} finally {
-			esp.Unmount();
 		}
 		Console.WriteLine("Press any key to quit.");
 		Console.ReadKey();
