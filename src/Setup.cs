@@ -42,6 +42,7 @@ public class Setup: SetupHelper {
 		if (Esp.Path == null) {
 			throw new SetupException("EFI System Partition was not found.");
 		}
+		Console.WriteLine("EFI System Partition location is " + Esp.Path);
 	}
 
 	/**
@@ -50,7 +51,7 @@ public class Setup: SetupHelper {
 	public enum BootLoaderType {
 		Unknown,
 		MS,
-		HackBGRT
+		Own
 	}
 
 	/**
@@ -82,7 +83,7 @@ public class Setup: SetupHelper {
 				Exists = true;
 				string tmp = System.Text.Encoding.ASCII.GetString(data);
 				if (tmp.IndexOf("HackBGRT") >= 0) {
-					Type = BootLoaderType.HackBGRT;
+					Type = BootLoaderType.Own;
 				} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
 					Type = BootLoaderType.MS;
 				}
@@ -113,142 +114,88 @@ public class Setup: SetupHelper {
 	}
 
 	/**
-	 * Backup the original boot loader.
-	 *
-	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
-	 * @param msloader Information of the MS boot loader to backup.
-	 * @return Information about the boot loader backup.
+	 * Install files and replace the MsLoader with our own.
 	 */
-	public static BootLoaderInfo Backup(string hackbgrt, BootLoaderInfo msloader) {
-		BootLoaderInfo msbackup = new BootLoaderInfo(hackbgrt + "\\bootmgfw-original.efi");
+	protected void Install() {
 		try {
-			if (!Directory.Exists(hackbgrt)) {
-				Directory.CreateDirectory(hackbgrt);
-			}
-			if (msloader.Type == BootLoaderType.HackBGRT) {
-				Console.WriteLine(msloader.Path + " already contains a version of HackBGRT, skipping backup.");
-			} else if (msloader.Type == BootLoaderType.MS) {
-				// Overwrite any previous backup, the file might have changed.
-				if (!msbackup.ReplaceWith(msloader)) {
-					throw new SetupException("Couldn't backup the original bootmgfw.efi.");
-				}
-			} else {
-				Console.WriteLine(msloader.Path + " doesn't look right, skipping backup.");
+			if (!Directory.Exists(Destination)) {
+				Directory.CreateDirectory(Destination);
 			}
 		} catch {
-			throw new SetupException("Couldn't backup the original bootmgfw.efi.");
+			throw new SetupException("Failed to copy files to ESP!");
 		}
-		if (msbackup.Arch == null || msbackup.Type != BootLoaderType.MS) {
-			throw new SetupException("The boot loader backup (" + msbackup.Path + ") doesn't look like a supported MS boot loader");
+		if (MsLoader.Type == BootLoaderType.MS) {
+			if (!MsLoaderBackup.ReplaceWith(MsLoader)) {
+				throw new SetupException("Failed to backup MS boot loader!");
+			}
 		}
-		return msbackup;
-	}
-
-	/**
-	 * Install HackBGRT, copy files and replace the msloader with our own.
-	 *
-	 * @param src Path to the installation files.
-	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
-	 * @param msloader Information of the MS boot loader to replace.
-	 * @param msbackup Information of the boot loader backup.
-	 */
-	public static void Install(string src, string hackbgrt, BootLoaderInfo msloader, BootLoaderInfo msbackup) {
-		string loaderName = "boot" + msbackup.Arch + ".efi";
-		string loaderSrc = src + "\\" + loaderName;
-		string loaderInst = hackbgrt + "\\" + loaderName;
-		if (!File.Exists(loaderSrc)) {
-			throw new SetupException(loaderName + " doesn't exist.");
+		if (MsLoaderBackup.Type != BootLoaderType.MS) {
+			// Duplicate check, but better to be sure...
+			throw new SetupException("Failed to detect MS boot loader!");
 		}
-		Copy(loaderSrc, loaderInst);
-		if (!File.Exists(hackbgrt + "\\config.txt")) {
-			Copy(src + "\\config.txt", hackbgrt + "\\config.txt");
+		if (!NewLoader.ReplaceWith(NewLoaderSource)) {
+			throw new SetupException("Couldn't copy new HackBGRT to ESP.");
 		}
-		if (!File.Exists(hackbgrt + "\\splash.bmp")) {
-			Copy(src + "\\splash.bmp", hackbgrt + "\\splash.bmp");
+		if (!File.Exists(Config)) {
+			Copy(Source + "\\config.txt", Config);
 		}
-		Enable(hackbgrt, msloader, msbackup);
-		Configure(hackbgrt);
-	}
-
-	/**
-	 * Enable HackBGRT, replace the msloader with our own.
-	 *
-	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
-	 * @param msloader Information of the MS boot loader to replace.
-	 * @param msbackup Information of the boot loader backup.
-	 */
-	public static void Enable(string hackbgrt, BootLoaderInfo msloader, BootLoaderInfo msbackup) {
-		string loaderName = "boot" + msbackup.Arch + ".efi";
-		BootLoaderInfo loaderInst = new BootLoaderInfo(hackbgrt + "\\" + loaderName);
-		if (!loaderInst.Exists) {
-			throw new SetupException(loaderInst + " doesn't exist.");
+		if (!File.Exists(Splash)) {
+			Copy(Source + "\\splash.bmp", Splash);
 		}
-		if (!msloader.ReplaceWith(loaderInst)) {
-			msloader.ReplaceWith(msbackup);
-			throw new SetupException("Couldn't install the new bootmgfw.efi.");
+		Configure();
+		if (!MsLoader.ReplaceWith(NewLoader)) {
+			MsLoader.ReplaceWith(MsLoaderBackup);
+			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
 		}
-		Console.WriteLine("HackBGRT is now enabled.");
+		Console.WriteLine("HackBGRT is now installed.");
 	}
 
 	/**
 	 * Configure HackBGRT.
-	 *
-	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
 	 */
-	public static void Configure(string hackbgrt) {
+	protected void Configure() {
 		// Open config.txt in notepad.
-		Console.WriteLine("Check the configuration in " + hackbgrt + "\\config.txt.");
-		Console.WriteLine("Use the supplied config.txt as reference.");
-		Console.WriteLine("Be sure to check for any format changes if updating!");
+		Console.WriteLine("Check the configuration in " + Config + ".");
+		Console.WriteLine(" - Use the supplied config.txt as reference.");
+		Console.WriteLine(" - Be sure to check for any format changes if updating!");
 		try {
-			StartProcess("notepad", hackbgrt + "\\config.txt").WaitForExit();
+			StartProcess("notepad", Config).WaitForExit();
 		} catch {
-			Console.WriteLine("Editing config.txt with notepad failed! Edit it manually.");
+			Console.WriteLine("Editing config.txt with notepad failed!");
 		}
+		Console.WriteLine();
 
 		// Open splash.bmp in mspaint.
-		Console.WriteLine("Draw or copy your preferred image to splash.bmp.");
+		Console.WriteLine("Draw or copy your preferred image to " + Splash + ".");
 		try {
-			StartProcess("mspaint", hackbgrt + "\\splash.bmp").WaitForExit();
+			StartProcess("mspaint", Splash).WaitForExit();
 		} catch {
-			Console.WriteLine("Editing splash.bmp with mspaint failed! Edit it manually.");
+			Console.WriteLine("Editing splash.bmp with mspaint failed!");
 		}
+		Console.WriteLine();
 	}
 
 	/**
 	 * Disable HackBGRT, restore the original boot loader.
-	 *
-	 * @param hackbgrt Where HackBGRT is installed.
-	 * @param msloader Where to restore the MS boot loader.
 	 */
-	public static void Disable(string hackbgrt, BootLoaderInfo msloader) {
-		BootLoaderInfo msbackup = new BootLoaderInfo(hackbgrt + "\\bootmgfw-original.efi");
-		if (msloader.Type == BootLoaderType.MS) {
-			Console.WriteLine(msloader + " is already ok.");
-		} else {
-			if (!msbackup.Exists) {
-				throw new SetupException("Missing the original bootmgfw.efi.");
+	protected void Disable() {
+		if (MsLoader.Type != BootLoaderType.MS) {
+			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
+				throw new SetupException("Couldn't restore the old MS loader.");
 			}
-			if (!msloader.ReplaceWith(msbackup)) {
-				throw new SetupException("Failed to restore the original bootmgfw.efi.");
-			}
-			Console.WriteLine(msloader.Path + " has been restored.");
 		}
+		Console.WriteLine(MsLoader.Path + " has been restored.");
 	}
 
 	/**
-	 * Uninstall HackBGRT, restore the original boot loader.
-	 *
-	 * @param hackbgrt Where HackBGRT is installed.
-	 * @param msloader Where to restore the MS boot loader.
+	 * Uninstall HackBGRT completely.
 	 */
-	public static void Uninstall(string hackbgrt, BootLoaderInfo msloader) {
-		Disable(hackbgrt, msloader);
+	protected void Uninstall() {
 		try {
-			Directory.Delete(hackbgrt, true);
+			Directory.Delete(Destination, true);
 			Console.WriteLine("HackBGRT has been removed.");
 		} catch {
-			Console.WriteLine("The directory " + hackbgrt + " couldn't be removed.");
+			throw new SetupException("The directory " + Destination + " couldn't be removed.");
 		}
 	}
 
@@ -298,43 +245,91 @@ public class Setup: SetupHelper {
 		}
 	}
 
+	protected string Source, Destination, Config, Splash;
+	protected BootLoaderInfo MsLoader, MsLoaderBackup, NewLoader, NewLoaderSource;
+	protected string EfiArch;
+
+	/**
+	 * Initialize information for the Setup.
+	 */
+	protected Setup(string source, string esp) {
+		Source = source;
+		Destination = esp + "\\EFI\\HackBGRT";
+		Config = Destination + "\\config.txt";
+		Splash = Destination + "\\splash.bmp";
+		MsLoaderBackup = new BootLoaderInfo(Destination + "\\bootmgfw-original.efi");
+		MsLoader = new BootLoaderInfo(esp + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
+		if (MsLoader.Type == BootLoaderType.MS) {
+			EfiArch = MsLoader.Arch;
+		} else if (MsLoaderBackup.Type == BootLoaderType.MS) {
+			EfiArch = MsLoaderBackup.Arch;
+		} else {
+			throw new SetupException("Failed to detect MS boot loader!");
+		}
+		string loaderName = "boot" + EfiArch + ".efi";
+		NewLoaderSource = new BootLoaderInfo(Source + "\\" + loaderName);
+		NewLoader = new BootLoaderInfo(Destination + "\\" + loaderName);
+		if (!NewLoaderSource.Exists) {
+			throw new SetupException("Couldn't find required files! Missing: " + NewLoaderSource.Path);
+		}
+	}
+
+	/**
+	 * Ask for user's choice and install/uninstall.
+	 */
+	protected void HandleUserAction() {
+		bool isEnabled = MsLoader.Type == BootLoaderType.Own;
+		bool isInstalled = NewLoader.Type == BootLoaderType.Own;
+
+		if (isEnabled) {
+			Console.WriteLine("HackBGRT is currently enabled.");
+		} else {
+			if (isInstalled) {
+				Console.WriteLine("HackBGRT is currently disabled.");
+			} else {
+				Console.WriteLine("HackBGRT is currently not installed.");
+			}
+		}
+		Console.WriteLine();
+		Console.WriteLine("Choose action (press a key):");
+		Console.WriteLine(" I = install, upgrade, repair, modify...");
+		if (isEnabled) {
+			Console.WriteLine(" D = disable, restore the original boot loader");
+		}
+		if (isInstalled) {
+			Console.WriteLine(" R = remove completely; delete all HackBGRT files and images");
+		}
+		Console.WriteLine(" C = cancel");
+
+		var k = Console.ReadKey().Key;
+		Console.WriteLine();
+		if (k == ConsoleKey.I) {
+			Install();
+		} else if ((isEnabled && k == ConsoleKey.D) || (isInstalled && k == ConsoleKey.R)) {
+			if (isEnabled) {
+				Disable();
+			}
+			if (k == ConsoleKey.R) {
+				Uninstall(); // NOTICE: It's imperative to Disable() first!
+			}
+		} else if (k == ConsoleKey.C) {
+			throw new ExitSetup(1);
+		} else {
+			throw new SetupException("Invalid choice!");
+		}
+	}
+
 	/**
 	 * Run the setup.
 	 *
-	 * @param src Path to the installation files.
+	 * @param source Path to the installation files.
 	 */
-	public static void RunSetup(string src) {
+	public static void RunSetup(string source) {
 		try {
 			InitEspPath();
 			HandleSecureBoot();
-
-			string hackbgrt = Esp.Path + "\\EFI\\HackBGRT";
-			BootLoaderInfo msloader = new BootLoaderInfo(Esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
-			if (!Directory.Exists(hackbgrt)) {
-				Install(src, hackbgrt, msloader, Backup(hackbgrt, msloader));
-			} else {
-				Console.WriteLine("Choose action (press a key):");
-				Console.WriteLine(" I = install, upgrade, fix installation");
-				Console.WriteLine(" C = configure (edit config.txt and splash.bmp)");
-				Console.WriteLine(" E = enable (after disabling); if in doubt, choose 'I' instead");
-				Console.WriteLine(" D = disable, restore the original boot loader");
-				Console.WriteLine(" R = remove completely; fully delete " + hackbgrt);
-				var k = Console.ReadKey().Key;
-				Console.WriteLine();
-				if (k == ConsoleKey.I) {
-					Install(src, hackbgrt, msloader, Backup(hackbgrt, msloader));
-				} else if (k == ConsoleKey.C) {
-					Configure(hackbgrt);
-				} else if (k == ConsoleKey.E) {
-					Enable(hackbgrt, msloader, Backup(hackbgrt, msloader));
-				} else if (k == ConsoleKey.D) {
-					Disable(hackbgrt, msloader);
-				} else if (k == ConsoleKey.R) {
-					Uninstall(hackbgrt, msloader);
-				} else {
-					throw new SetupException("Invalid choice!");
-				}
-			}
+			var s = new Setup(source, Esp.Path);
+			s.HandleUserAction();
 		} catch (ExitSetup e) {
 			Environment.ExitCode = e.Code;
 		} catch (SetupException e) {
