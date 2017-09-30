@@ -72,69 +72,86 @@ public class Setup: SetupHelper {
 	/**
 	 * Information about a boot loader: type and architecture.
 	 */
-	public struct BootLoaderInfo {
+	public class BootLoaderInfo {
 		public string Path;
 		public bool Exists;
 		public BootLoaderType Type;
 		public string Arch;
-	}
 
-	/**
-	 * Recognize the boot loader type (MS/HackBGRT) and architecture.
-	 *
-	 * @param path Path to the boot loader.
-	 * @return Information about the boot loader.
-	 */
-	public static BootLoaderInfo RecognizeLoader(string path) {
-		BootLoaderInfo info;
-		info.Path = path;
-		info.Exists = false;
-		info.Type = BootLoaderType.Unknown;
-		info.Arch = null;
-		try {
-			byte[] data = File.ReadAllBytes(path);
-			info.Exists = true;
-			string tmp = System.Text.Encoding.ASCII.GetString(data);
-			if (tmp.IndexOf("HackBGRT") >= 0) {
-				info.Type = BootLoaderType.HackBGRT;
-			} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
-				info.Type = BootLoaderType.MS;
-			}
-			switch (BitConverter.ToUInt16(data, BitConverter.ToInt32(data, 0x3c) + 4)) {
-				case 0x014c: info.Arch = "ia32"; break;
-				case 0x0200: info.Arch = "ia64"; break;
-				case 0x8664: info.Arch = "x64"; break;
-			}
-		} catch {
+		/**
+		 * Constructor. Also recognizes the boot loader.
+		 */
+		public BootLoaderInfo(string path) {
+			Path = path;
+			Detect();
 		}
-		return info;
+
+		/**
+		 * Recognize the boot loader type (MS/HackBGRT) and architecture.
+		 */
+		public void Detect() {
+			Exists = false;
+			Type = BootLoaderType.Unknown;
+			Arch = null;
+			try {
+				byte[] data = File.ReadAllBytes(Path);
+				Exists = true;
+				string tmp = System.Text.Encoding.ASCII.GetString(data);
+				if (tmp.IndexOf("HackBGRT") >= 0) {
+					Type = BootLoaderType.HackBGRT;
+				} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
+					Type = BootLoaderType.MS;
+				}
+				switch (BitConverter.ToUInt16(data, BitConverter.ToInt32(data, 0x3c) + 4)) {
+					case 0x014c: Arch = "ia32"; break;
+					case 0x0200: Arch = "ia64"; break;
+					case 0x8664: Arch = "x64"; break;
+				}
+			} catch {
+			}
+		}
+
+		/**
+		 * Replace this boot loader with another.
+		 *
+		 * @param other The new boot loader.
+		 * @return true if the replacement was successful.
+		 */
+		public bool ReplaceWith(BootLoaderInfo other) {
+			if (!other.Exists || !Copy(other.Path, Path)) {
+				return false;
+			}
+			Exists = other.Exists;
+			Type = other.Type;
+			Arch = other.Arch;
+			return true;
+		}
 	}
 
 	/**
 	 * Backup the original boot loader.
 	 *
 	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
-	 * @param msloader Path of the MS boot loader to backup.
+	 * @param msloader Information of the MS boot loader to backup.
 	 * @return Information about the boot loader backup.
 	 */
-	public static BootLoaderInfo Backup(string hackbgrt, string msloader) {
+	public static BootLoaderInfo Backup(string hackbgrt, BootLoaderInfo msloader) {
+		BootLoaderInfo msbackup = new BootLoaderInfo(hackbgrt + "\\bootmgfw-original.efi");
 		try {
 			if (!Directory.Exists(hackbgrt)) {
 				Directory.CreateDirectory(hackbgrt);
 			}
-			BootLoaderInfo info = RecognizeLoader(msloader);
-			if (info.Type == BootLoaderType.HackBGRT) {
-				Console.WriteLine(msloader + " already contains a version of HackBGRT, skipping backup.");
-			} else if (info.Type == BootLoaderType.MS) {
+			if (msloader.Type == BootLoaderType.HackBGRT) {
+				Console.WriteLine(msloader.Path + " already contains a version of HackBGRT, skipping backup.");
+			} else if (msloader.Type == BootLoaderType.MS) {
 				// Overwrite any previous backup, the file might have changed.
-				SetupHelper.Copy(msloader, hackbgrt + "\\bootmgfw-original.efi");
+				if (!msbackup.ReplaceWith(msloader)) {
+					throw new SetupException("Couldn't backup the original bootmgfw.efi.");
+				}
 			} else {
-				Console.WriteLine(msloader + " doesn't look right, skipping backup.");
+				Console.WriteLine(msloader.Path + " doesn't look right, skipping backup.");
 			}
 		} catch {
-		}
-		BootLoaderInfo msbackup = RecognizeLoader(hackbgrt + "\\bootmgfw-original.efi");
-		if (!msbackup.Exists) {
 			throw new SetupException("Couldn't backup the original bootmgfw.efi.");
 		}
 		if (msbackup.Arch == null || msbackup.Type != BootLoaderType.MS) {
@@ -148,10 +165,10 @@ public class Setup: SetupHelper {
 	 *
 	 * @param src Path to the installation files.
 	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
-	 * @param msloader Path of the MS boot loader to replace.
+	 * @param msloader Information of the MS boot loader to replace.
 	 * @param msbackup Information of the boot loader backup.
 	 */
-	public static void Install(string src, string hackbgrt, string msloader, BootLoaderInfo msbackup) {
+	public static void Install(string src, string hackbgrt, BootLoaderInfo msloader, BootLoaderInfo msbackup) {
 		string loaderName = "boot" + msbackup.Arch + ".efi";
 		string loaderSrc = src + "\\" + loaderName;
 		string loaderInst = hackbgrt + "\\" + loaderName;
@@ -173,17 +190,17 @@ public class Setup: SetupHelper {
 	 * Enable HackBGRT, replace the msloader with our own.
 	 *
 	 * @param hackbgrt Path to the HackBGRT directory on the ESP.
-	 * @param msloader Path of the MS boot loader to replace.
+	 * @param msloader Information of the MS boot loader to replace.
 	 * @param msbackup Information of the boot loader backup.
 	 */
-	public static void Enable(string hackbgrt, string msloader, BootLoaderInfo msbackup) {
+	public static void Enable(string hackbgrt, BootLoaderInfo msloader, BootLoaderInfo msbackup) {
 		string loaderName = "boot" + msbackup.Arch + ".efi";
-		string loaderInst = hackbgrt + "\\" + loaderName;
-		if (!File.Exists(loaderInst)) {
+		BootLoaderInfo loaderInst = new BootLoaderInfo(hackbgrt + "\\" + loaderName);
+		if (!loaderInst.Exists) {
 			throw new SetupException(loaderInst + " doesn't exist.");
 		}
-		if (!SetupHelper.Copy(loaderInst, msloader)) {
-			SetupHelper.Copy(msbackup.Path, msloader);
+		if (!msloader.ReplaceWith(loaderInst)) {
+			msloader.ReplaceWith(msbackup);
 			throw new SetupException("Couldn't install the new bootmgfw.efi.");
 		}
 		Console.WriteLine("HackBGRT is now enabled.");
@@ -220,18 +237,18 @@ public class Setup: SetupHelper {
 	 * @param hackbgrt Where HackBGRT is installed.
 	 * @param msloader Where to restore the MS boot loader.
 	 */
-	public static void Disable(string hackbgrt, string msloader) {
-		BootLoaderInfo info = RecognizeLoader(msloader);
-		if (info.Type == BootLoaderType.MS) {
+	public static void Disable(string hackbgrt, BootLoaderInfo msloader) {
+		BootLoaderInfo msbackup = new BootLoaderInfo(hackbgrt + "\\bootmgfw-original.efi");
+		if (msloader.Type == BootLoaderType.MS) {
 			Console.WriteLine(msloader + " is already ok.");
 		} else {
-			if (!File.Exists(hackbgrt + "\\bootmgfw-original.efi")) {
+			if (!msbackup.Exists) {
 				throw new SetupException("Missing the original bootmgfw.efi.");
 			}
-			if (!SetupHelper.Copy(hackbgrt + "\\bootmgfw-original.efi", msloader)) {
+			if (!msloader.ReplaceWith(msbackup)) {
 				throw new SetupException("Failed to restore the original bootmgfw.efi.");
 			}
-			Console.WriteLine(msloader + " has been restored.");
+			Console.WriteLine(msloader.Path + " has been restored.");
 		}
 	}
 
@@ -241,7 +258,7 @@ public class Setup: SetupHelper {
 	 * @param hackbgrt Where HackBGRT is installed.
 	 * @param msloader Where to restore the MS boot loader.
 	 */
-	public static void Uninstall(string hackbgrt, string msloader) {
+	public static void Uninstall(string hackbgrt, BootLoaderInfo msloader) {
 		Disable(hackbgrt, msloader);
 		try {
 			Directory.Delete(hackbgrt, true);
@@ -293,7 +310,7 @@ public class Setup: SetupHelper {
 				}
 			}
 			string hackbgrt = esp.Path + "\\EFI\\HackBGRT";
-			string msloader = esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
+			BootLoaderInfo msloader = new BootLoaderInfo(esp.Path + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
 			if (!Directory.Exists(hackbgrt)) {
 				Install(src, hackbgrt, msloader, Backup(hackbgrt, msloader));
 			} else {
