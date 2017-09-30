@@ -91,6 +91,7 @@ public class SetupHelper {
 				Environment.ExitCode = p.ExitCode;
 				return;
 			}
+			Efi.EnablePrivilege();
 		} catch {
 			Console.WriteLine("This installer needs to be run as administrator!");
 			Console.WriteLine("Press any key to quit.");

@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Microsoft.Win32;
 
 /**
  * HackBGRT Setup.
@@ -203,7 +202,7 @@ public class Setup: SetupHelper {
 	 * Check Secure Boot status and inform the user.
 	 */
 	public static void HandleSecureBoot() {
-		int secureBoot = EfiGetSecureBootStatus();
+		int secureBoot = Efi.GetSecureBootStatus();
 		if (secureBoot == 0) {
 			Console.WriteLine("Secure Boot is disabled, good!");
 		} else {
@@ -215,33 +214,33 @@ public class Setup: SetupHelper {
 			Console.WriteLine("It's very important to disable Secure Boot before installing.");
 			Console.WriteLine("Otherwise your machine may become unbootable.");
 			Console.WriteLine("Choose action (press a key):");
+			bool canBootToFW = Efi.CanBootToFW();
+			if (canBootToFW) {
+				Console.WriteLine(" S = Enter EFI Setup to disable Secure Boot manually; requires reboot!");
+			}
 			Console.WriteLine(" I = Install anyway; THIS MAY BE DANGEROUS!");
 			Console.WriteLine(" C = Cancel");
 			var k = Console.ReadKey().Key;
 			Console.WriteLine();
 			if (k == ConsoleKey.I) {
 				Console.WriteLine("Continuing. THIS MAY BE DANGEROUS!");
+			} else if (canBootToFW && k == ConsoleKey.S) {
+				Efi.SetBootToFW();
+				Console.WriteLine();
+				Console.WriteLine("Reboot your computer. You will then automatically enter the UEFI setup.");
+				Console.WriteLine("Find and disable Secure Boot, then save and exit, then run this installer.");
+				Console.WriteLine("Press R to reboot now, other key to exit.");
+				var k2 = Console.ReadKey().Key;
+				Console.WriteLine();
+				if (k2 == ConsoleKey.R) {
+					StartProcess("shutdown", "-f -r -t 1");
+				}
+				Environment.Exit(0);
+				throw new ExitSetup(0);
 			} else {
 				Console.WriteLine("Aborting because of Secure Boot.");
 				throw new ExitSetup(1);
 			}
-		}
-	}
-
-	/**
-	 * Check if Secure Boot is enabled.
-	 *
-	 * @return 0 for disabled, 1 for enabled, other for unknown.
-	 */
-	public static int EfiGetSecureBootStatus() {
-		try {
-			return (int) Registry.GetValue(
-				"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State",
-				"UEFISecureBootEnabled",
-				-1
-			);
-		} catch (Exception) {
-			return -1;
 		}
 	}
 
