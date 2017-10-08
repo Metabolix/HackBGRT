@@ -39,9 +39,9 @@ public class Efi {
 	 * Information about an EFI variable.
 	 */
 	public class Variable {
-		public string name, guid;
-		public UInt32 attributes;
-		public byte[] data;
+		public string Name, Guid;
+		public UInt32 Attributes;
+		public byte[] Data;
 	}
 
 	public const string EFI_GLOBAL_GUID = "{8be4df61-93ca-11d2-aa0d-00e098032b8c}";
@@ -83,19 +83,19 @@ public class Efi {
 	 */
 	private static Variable GetVariable(string name, string guid = EFI_GLOBAL_GUID) {
 		Variable result = new Variable();
-		result.name = name;
-		result.guid = guid;
-		result.data = null;
-		result.attributes = 0;
+		result.Name = name;
+		result.Guid = guid;
+		result.Data = null;
+		result.Attributes = 0;
 		for (UInt32 i = 4096; i <= 1024*1024; i *= 2) {
 			byte[] buf = new byte[i];
-			UInt32 len = GetFirmwareEnvironmentVariableEx(name, guid, buf, (UInt32) buf.Length, out result.attributes);
+			UInt32 len = GetFirmwareEnvironmentVariableEx(name, guid, buf, (UInt32) buf.Length, out result.Attributes);
 			if (len == buf.Length) {
 				continue;
 			}
 			if (len > 0 || Marshal.GetLastWin32Error() == 0) {
-				result.data = new byte[len];
-				Array.Copy(buf, 0, result.data, 0, len);
+				result.Data = new byte[len];
+				Array.Copy(buf, 0, result.Data, 0, len);
 				return result;
 			}
 			switch (len != 0 ? 0 : Marshal.GetLastWin32Error()) {
@@ -119,7 +119,7 @@ public class Efi {
 	 * @param v Information of the variable.
 	 */
 	private static void SetVariable(Variable v) {
-		UInt32 r = SetFirmwareEnvironmentVariableEx(v.name, v.guid, v.data, (UInt32) v.data.Length, v.attributes);
+		UInt32 r = SetFirmwareEnvironmentVariableEx(v.Name, v.Guid, v.Data, (UInt32) v.Data.Length, v.Attributes);
 		if (r == 0) {
 			switch (Marshal.GetLastWin32Error()) {
 				case 87:
@@ -159,7 +159,7 @@ public class Efi {
 	public static bool CanBootToFW() {
 		try {
 			Variable tmp = GetVariable("OsIndicationsSupported");
-			return tmp.data != null && (tmp.data[0] & 1) != 0;
+			return tmp.Data != null && (tmp.Data[0] & 1) != 0;
 		} catch {
 			return false;
 		}
@@ -170,7 +170,7 @@ public class Efi {
 	 */
 	public static void SetBootToFW() {
 		Variable tmp = GetVariable("OsIndications");
-		tmp.data[0] |= 1;
+		tmp.Data[0] |= 1;
 		SetVariable(tmp);
 	}
 }
