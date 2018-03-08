@@ -115,7 +115,7 @@ public class Setup: SetupHelper {
 	/**
 	 * Install files and replace the MsLoader with our own.
 	 */
-	protected void Install() {
+	protected void Install(bool showEditors = true) {
 		try {
 			if (!Directory.Exists(Destination)) {
 				Directory.CreateDirectory(Destination);
@@ -141,7 +141,9 @@ public class Setup: SetupHelper {
 		if (!File.Exists(Splash)) {
 			Copy(Source + "\\splash.bmp", Splash);
 		}
-		Configure();
+		if (showEditors) {
+			Configure();
+		}
 		if (!MsLoader.ReplaceWith(NewLoader)) {
 			MsLoader.ReplaceWith(MsLoaderBackup);
 			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
@@ -276,7 +278,7 @@ public class Setup: SetupHelper {
 	/**
 	 * Ask for user's choice and install/uninstall.
 	 */
-	protected void HandleUserAction() {
+	protected void HandleUserAction(string predefinedAction = null) {
 		bool isEnabled = MsLoader.Type == BootLoaderType.Own;
 		bool isInstalled = NewLoader.Type == BootLoaderType.Own;
 
@@ -292,6 +294,9 @@ public class Setup: SetupHelper {
 		Console.WriteLine();
 		Console.WriteLine("Choose action (press a key):");
 		Console.WriteLine(" I = install, upgrade, repair, modify...");
+		if (!isEnabled && isInstalled) {
+			Console.WriteLine(" E = enable installed loader without changing its settings");
+		}
 		if (isEnabled) {
 			Console.WriteLine(" D = disable, restore the original boot loader");
 		}
@@ -300,10 +305,22 @@ public class Setup: SetupHelper {
 		}
 		Console.WriteLine(" C = cancel");
 
-		var k = Console.ReadKey().Key;
+		ConsoleKey k = ConsoleKey.NoName;	// prevent CS0165, use of unassigned local variable
+		bool couldParsePredefined = false;  // (relation between couldParsePredefined and k is invisible to compiler)
+		if (!string.IsNullOrEmpty(predefinedAction)) {
+			couldParsePredefined = Enum.TryParse(predefinedAction, out k);
+		}
+		if(couldParsePredefined) {
+			Console.WriteLine("-> Automatically chose option '{0}' due to command line arguments.", k.ToString());
+		} else {
+			k = Console.ReadKey().Key;
+		}
+
 		Console.WriteLine();
-		if (k == ConsoleKey.I) {
+		if(k == ConsoleKey.I) {
 			Install();
+		} else if (isInstalled && k == ConsoleKey.E) {
+			Install(false);
 		} else if ((isEnabled && k == ConsoleKey.D) || (isInstalled && k == ConsoleKey.R)) {
 			if (isEnabled) {
 				Disable();
@@ -323,23 +340,36 @@ public class Setup: SetupHelper {
 	 *
 	 * @param source Path to the installation files.
 	 */
-	public static void RunSetup(string source) {
+	public static void RunSetup(string source, string[] args = null) {
+		bool waitForKeyPress = true;
 		try {
 			InitEspPath();
 			HandleSecureBoot();
-			var s = new Setup(source, Esp.Path);
-			s.HandleUserAction();
+			Setup s = new Setup(source, Esp.Path);
+			string predefinedAction = null;
+			foreach(string arg in args) {
+				if(arg.Length == 1) {
+					predefinedAction = arg.ToUpper();
+					waitForKeyPress = false;
+					break;
+				}
+			}
+			s.HandleUserAction(predefinedAction);
 		} catch (ExitSetup e) {
 			Environment.ExitCode = e.Code;
 		} catch (SetupException e) {
 			Console.WriteLine("Error: {0}", e.Message);
 			Environment.ExitCode = 1;
+			waitForKeyPress = true;
 		} catch (Exception e) {
 			Console.WriteLine("Unexpected error!\n{0}", e.ToString());
 			Console.WriteLine("If this is the most current release, please report this bug.");
 			Environment.ExitCode = 1;
+			waitForKeyPress = true;
 		}
-		Console.WriteLine("Press any key to quit.");
+		if (waitForKeyPress) {
+			Console.WriteLine("Press any key to quit.");
+		}
 		Console.ReadKey();
 	}
 }
