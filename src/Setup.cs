@@ -369,7 +369,7 @@ public class Setup: SetupHelper {
 		}
 		if (waitForKeyPress) {
 			Console.WriteLine("Press any key to quit.");
-			
+			Console.ReadKey();
 		}
 	}
 }
