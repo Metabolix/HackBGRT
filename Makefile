@@ -31,7 +31,7 @@ src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
 	echo 'public class GIT_DESCRIBE { public static string data = "$(GIT_DESCRIBE)"; }' > $@
 
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
-	mcs -define:GIT_DESCRIBE -out:$@ $^
+	csc /define:GIT_DESCRIBE /out:$@ $^
 
 bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
 bootx64.efi: GNUEFI_ARCH = x86_64
