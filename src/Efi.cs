@@ -170,6 +170,10 @@ public class Efi {
 	 */
 	public static void SetBootToFW() {
 		Variable tmp = GetVariable("OsIndications");
+		if (tmp.Data == null) {
+			tmp.Data = new byte[8];
+			tmp.Attributes = 7;
+		}
 		tmp.Data[0] |= 1;
 		SetVariable(tmp);
 	}
