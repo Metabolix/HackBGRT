@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.5.1 - 2018-08-11
+
+### Fixed
+- Clarify the default config.txt.
+- Fix an exception in some cases when trying to boot to UEFI setup.
+
 ## 1.5.0 - 2017-09-30
 
 ### Added
