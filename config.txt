@@ -16,6 +16,7 @@ boot=\EFI\HackBGRT\bootmgfw-original.efi
 #  - "remove" to remove the BGRT. Makes x and y meaningless.
 #  - "black" to use only a black image. Makes x and y meaningless.
 #  - "path=..." to read a BMP file. The file must be a 24-bit BMP file with a 54-byte header.
+#    * NOTE: The file must be on the EFI System Partition. Do not add a drive letter!
 # Examples:
 #  - image=remove
 #  - image=black
