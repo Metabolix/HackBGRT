@@ -34,3 +34,7 @@ image=path=\EFI\HackBGRT\splash.bmp
 
 # Preferred resolution. Use 0x0 for maximum and -1x-1 for original.
 resolution=0x0
+
+# Debug mode (0 for disabled, 1 for enabled).
+# Shows debug information and prompts for keypress before booting.
+debug=0
