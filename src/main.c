@@ -8,7 +8,7 @@
 /**
  * The Print function signature.
  */
-typedef UINTN print_t(IN CHAR16 *fmt, ...);
+typedef UINTN print_t(IN CONST CHAR16 *fmt, ...);
 
 /**
  * The function for debug printing; either Print or NullPrint.

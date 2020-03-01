@@ -14,7 +14,7 @@ extern const CHAR16* TmpStr(CHAR8 *src, int length);
 /**
  * Empty function that has the same signature as Print.
  */
-extern UINTN NullPrint(IN CHAR16 *fmt, ...);
+extern UINTN NullPrint(IN CONST CHAR16 *fmt, ...);
 
 /**
  * Return the greater of two numbers.

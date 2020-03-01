@@ -14,7 +14,7 @@ const CHAR16* TmpStr(CHAR8 *src, int length) {
 	return dest;
 }
 
-UINTN NullPrint(IN CHAR16 *fmt, ...) {
+UINTN NullPrint(IN CONST CHAR16 *fmt, ...) {
 	return 0;
 }
 
