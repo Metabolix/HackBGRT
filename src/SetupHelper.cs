@@ -83,7 +83,7 @@ public class SetupHelper {
 			var admin = WindowsBuiltInRole.Administrator;
 			if (!principal.IsInRole(admin) && !args.Contains("no-elevate")) {
 				ProcessStartInfo startInfo = new ProcessStartInfo(self);
-				startInfo.Arguments = "no-elevate";
+				startInfo.Arguments = "no-elevate " + String.Join(" ", args);
 				startInfo.Verb = "runas";
 				startInfo.UseShellExecute = true;
 				Process p = Process.Start(startInfo);
@@ -99,6 +99,6 @@ public class SetupHelper {
 			Environment.ExitCode = 1;
 			return;
 		}
-		Setup.RunSetup(Path.GetDirectoryName(self));
+		Setup.RunSetup(Path.GetDirectoryName(self), args);
 	}
 }
