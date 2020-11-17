@@ -1,0 +1,178 @@
+# How to build HackBGRT.efi using Windows 10 WSL Debian
+# 3rd
+
+# UEFI OVMF Open Virtual Machine Firmware
+wget http://downloads.sourceforge.net/project/edk2/OVMF/OVMF-X64-r15214.zip
+unzip OVMF-X64-r15214.zip OVMF.fd
+rm OVMF-X64-r15214.zip
+
+# Create EFI area
+mkdir image
+cp HackBGRT_*.efi ./image
+
+mkdir image/EFI
+mkdir image/EFI/HackBGRT
+
+# Enable Debug mode
+sed -i 's/debug=0/debug=1/' config.txt
+cp config.txt ./image/EFI/HackBGRT
+cp splash.bmp ./image/EFI/HackBGRT
+cp ./PngSuite/PngSuite.png ./image/EFI/HackBGRT
+# image=path=\EFI\HackBGRT\PngSuite.png
+
+# QEMU
+qemu-system-x86_64 -nographic -bios OVMF.fd -drive file=fat:rw:image,media=disk,format=raw
+
+# Type in Shell
+# Shell>
+# fs0:
+# cls
+# ls
+# HackBGRT_x86_64.efi
+
+# END QEMU (Ctrl + a),(x)
+
+--------
+FS0:\> HackBGRT_PNG_x86_64.efi
+Looking for resolution 2147483647x2147483647...
+Found resolution 1024x768.
+RSDP: revision = 2, OEM ID = OVMF
+* XSDT: OEM ID = OVMF  , entry count = 4
+ - ACPI table: BGRT, revision = 0, OEM ID = Mtblx*
+ -> Returning this one for later use.
+HackBGRT: Loading \EFI\HackBGRT\splash.bmp.
+HackBGRT: Filename Len 24, Last Char p.
+HackBGRT: BMP at (384, 192).
+RSDP: revision = 2, OEM ID = OVMF
+* XSDT: OEM ID = OVMF  , entry count = 4
+ - ACPI table: BGRT, revision = 0, OEM ID = Mtblx*
+ -> Replacing.
+HackBGRT: Loading application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT: Failed to load application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT: Loading application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT: Also failed to load application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT has failed. Use parameter debug=1 for details.
+Get a Windows install disk or a recovery disk to fix your boot.
+HackBGRT version: v1.5.1-9-g6f0b028
+Press any key to exit.
+
+--------
+FS0:\> cls
+FS0:\> HackBGRT_PNG_x86_64.efi
+Looking for resolution 2147483647x2147483647...
+Found resolution 1024x768.
+RSDP: revision = 2, OEM ID = OVMF
+* XSDT: OEM ID = OVMF  , entry count = 4
+ - ACPI table: BGRT, revision = 0, OEM ID = Mtblx*
+ -> Returning this one for later use.
+HackBGRT: Loading \EFI\HackBGRT\PngSuite.png.
+HackBGRT: Filename Len 26, Last Char g.
+HackBGRT: Loading PNG \EFI\HackBGRT\PngSuite.png.
+HackBGRT: init_bmp() (256 x 256).
+HackBGRT: init_bmp() AllocatePool 196662.
+size: 256x256x24 (196608)
+format: 1
+HackBGRT: bmp (   0,    0) #000000.
+HackBGRT: bmp (  32,    0) #000000.
+HackBGRT: bmp (  64,    0) #000000.
+HackBGRT: bmp (  96,    0) #000000.
+HackBGRT: bmp ( 128,    0) #000000.
+HackBGRT: bmp ( 160,    0) #000000.
+HackBGRT: bmp ( 192,    0) #000000.
+HackBGRT: bmp ( 224,    0) #000000.
+HackBGRT: bmp (   0,   32) #400000.
+HackBGRT: bmp (  32,   32) #402020.
+HackBGRT: bmp (  64,   32) #404040.
+HackBGRT: bmp (  96,   32) #204040.
+HackBGRT: bmp ( 128,   32) #004040.
+HackBGRT: bmp ( 160,   32) #004040.
+HackBGRT: bmp ( 192,   32) #000000.
+HackBGRT: bmp ( 224,   32) #400000.
+HackBGRT: bmp (   0,   64) #800000.
+HackBGRT: bmp (  32,   64) #804040.
+HackBGRT: bmp (  64,   64) #808080.
+HackBGRT: bmp (  96,   64) #408080.
+HackBGRT: bmp ( 128,   64) #008080.
+HackBGRT: bmp ( 160,   64) #008080.
+HackBGRT: bmp ( 192,   64) #000000.
+HackBGRT: bmp ( 224,   64) #800000.
+HackBGRT: bmp (   0,   96) #C00000.
+HackBGRT: bmp (  32,   96) #C06060.
+HackBGRT: bmp (  64,   96) #C0C0C0.
+HackBGRT: bmp (  96,   96) #60C0C0.
+HackBGRT: bmp ( 128,   96) #00C0C0.
+HackBGRT: bmp ( 160,   96) #00C0C0.
+HackBGRT: bmp ( 192,   96) #000000.
+HackBGRT: bmp ( 224,   96) #C00000.
+HackBGRT: bmp (   0,  128) #FF0101.
+HackBGRT: bmp (  32,  128) #FF8080.
+HackBGRT: bmp (  64,  128) #FFFFFF.
+HackBGRT: bmp (  96,  128) #80FFFF.
+HackBGRT: bmp ( 128,  128) #01FFFF.
+HackBGRT: bmp ( 160,  128) #01FFFF.
+HackBGRT: bmp ( 192,  128) #010101.
+HackBGRT: bmp ( 224,  128) #FF0101.
+HackBGRT: bmp (   0,  160) #FF4141.
+HackBGRT: bmp (  32,  160) #FFA0A0.
+HackBGRT: bmp (  64,  160) #FFFFFF.
+HackBGRT: bmp (  96,  160) #A0FFFF.
+HackBGRT: bmp ( 128,  160) #41FFFF.
+HackBGRT: bmp ( 160,  160) #41FFFF.
+HackBGRT: bmp ( 192,  160) #414141.
+HackBGRT: bmp ( 224,  160) #FF4141.
+HackBGRT: bmp (   0,  192) #FF8181.
+HackBGRT: bmp (  32,  192) #FFC0C0.
+HackBGRT: bmp (  64,  192) #FFFFFF.
+HackBGRT: bmp (  96,  192) #C0FFFF.
+HackBGRT: bmp ( 128,  192) #81FFFF.
+HackBGRT: bmp ( 160,  192) #81FFFF.
+HackBGRT: bmp ( 192,  192) #818181.
+HackBGRT: bmp ( 224,  192) #FF8181.
+HackBGRT: bmp (   0,  224) #FFC1C1.
+HackBGRT: bmp (  32,  224) #FFE0E0.
+HackBGRT: bmp (  64,  224) #FFFFFF.
+HackBGRT: bmp (  96,  224) #E0FFFF.
+HackBGRT: bmp ( 128,  224) #C1FFFF.
+HackBGRT: bmp ( 160,  224) #C1FFFF.
+HackBGRT: bmp ( 192,  224) #C1C1C1.
+HackBGRT: bmp ( 224,  224) #FFC1C1.
+HackBGRT: BMP at (384, 128).
+RSDP: revision = 2, OEM ID = OVMF
+* XSDT: OEM ID = OVMF  , entry count = 4
+ - ACPI table: BGRT, revision = 0, OEM ID = Mtblx*
+ -> Replacing.
+HackBGRT: Loading application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT: Failed to load application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT: Loading application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT: Also failed to load application \EFI\HackBGRT\bootmgfw-original.efi.
+HackBGRT has failed. Use parameter debug=1 for details.
+Get a Windows install disk or a recovery disk to fix your boot.
+HackBGRT version: v1.5.1-9-g6f0b028
+Press any key to exit.
+
+--------
+EFI file broken
+
+FS0:\> HackBGRT_PNG_x86_64.efi
+!!!! X64 Exception Type - 000000000000000E     CPU Apic ID - 00000000 !!!!
+RIP  - 0000000006491E77, CS  - 0000000000000028, RFLAGS - 0000000000000202
+ExceptionData - 0000000000000000
+RAX  - 0000006800740061, RCX - 00000000064FD718, RDX - 000000000649F240
+RBX  - 00000000064FD718, RSP - 0000000007F94650, RBP - 0000000007F947B0
+RSI  - 0000000007F21F18, RDI - 00000000064FD718
+R8   - 0000000007F946C0, R9  - 0000000007D4DF18, R10 - 00000000064FCF60
+R11  - 0000000006EFCE30, R12 - 0000000000000000, R13 - 0000000000000000
+R14  - 0000000000000000, R15 - 0000000000000000
+DS   - 0000000000000008, ES  - 0000000000000008, FS  - 0000000000000008
+GS   - 0000000000000008, SS  - 0000000000000008
+CR0  - 0000000080000033, CR2 - 00000068007400F9, CR3 - 0000000007F33000
+CR4  - 0000000000000668, CR8 - 0000000000000000
+DR0  - 0000000000000000, DR1 - 0000000000000000, DR2 - 0000000000000000
+DR3  - 0000000000000000, DR6 - 00000000FFFF0FF0, DR7 - 0000000000000400
+GDTR - 0000000007F1CE98 000000000000003F, LDTR - 0000000000000000
+IDTR - 0000000007C07018 0000000000000FFF,   TR - 0000000000000000
+FXSAVE_STATE - 0000000007F942B0
+!!!! Find PE image (No PDB)  (ImageBase=000000000648D000, EntryPoint=0000000006491000) !!!!
+--------
+
+[EOF]
