@@ -1,0 +1,38 @@
+# How to build HackBGRT.efi using Windows 10 WSL Debian
+# 2nd
+
+# Clone HackBGRT
+cd
+git clone https://github.com/FREEWING-JP/HackBGRT/ -b feature/WSL_Debian_build HackBGRT_WSL
+cd HackBGRT_WSL
+
+# Download gnu-efi
+wget https://jaist.dl.sourceforge.net/project/gnu-efi/gnu-efi-3.0.12.tar.bz2
+tar xvf gnu-efi-3.0.12.tar.bz2
+
+# Patch Install directory
+cd gnu-efi-3.0.12
+sed -i 's@INSTALLROOT  :=.*@INSTALLROOT  := ../../../gnu-efi@' Make.defaults
+
+# Make and Install gnu-efi
+make
+make install
+# Copy libefi.a
+make install
+cd ..
+
+# gnu-efi path
+ls -l ./gnu-efi/usr/local/*
+# */
+
+# Make HackBGRT.efi (64bit version only)
+mkdir ./obj
+make
+
+# *.efi
+ls -l *.efi
+
+# Copy HackBGRT.efi to Windows C:\TMP\
+cp *.efi /mnt/c/TMP/
+
+[EOF]

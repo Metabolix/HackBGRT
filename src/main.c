@@ -326,7 +326,7 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 /**
  * The main program.
  */
-EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
+EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	InitializeLib(image_handle, ST_);
 
 	EFI_LOADED_IMAGE* image;
@@ -412,6 +412,6 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
  *
  * Some compilers and architectures differ in underscore handling. This helps.
  */
-EFI_STATUS EFIAPI _EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
-	return EfiMain(image_handle, ST_);
-}
+// EFI_STATUS EFIAPI _EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
+// 	return EfiMain(image_handle, ST_);
+// }
