@@ -1,3 +1,19 @@
+# FREE WING mod version 2020/11
+
+How to build HackBGRT.efi using Windows 10 WSL Debian
+* Windows_WSL_Debian_1st.txt
+* Windows_WSL_Debian_2nd.txt
+* Windows_WSL_Debian_3rd.txt
+
+Caution:  
+Build only the 64-bit version .  
+Because I don't know how to write a Makefile script .  
+
+Reference:  
+UEFIアプリケーション開発環境を Windowsの WSL環境で構築して QEMU環境で動作確認する方法  
+http://www.neko.ne.jp/~freewing/software/uefi_bios_hack/  
+
+---
 # HackBGRT
 
 HackBGRT is intended as a boot logo changer for UEFI-based Windows systems.
