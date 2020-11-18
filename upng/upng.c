@@ -24,10 +24,12 @@ freely, subject to the following restrictions:
 		distribution.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <limits.h>
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <limits.h>
+
+#include "../my_efilib/my_efilib.h"
 
 #include "upng.h"
 
