@@ -1,10 +1,10 @@
 # How to build HackBGRT.efi using Windows 10 WSL Debian
 # 2nd
 
-# Clone HackBGRT
+# Clone HackBGRT HackBGRT_PNG_upng
 cd
-git clone https://github.com/FREEWING-JP/HackBGRT/ -b feature/WSL_Debian_build HackBGRT_WSL
-cd HackBGRT_WSL
+git clone https://github.com/FREEWING-JP/HackBGRT/ -b test/add_upng HackBGRT_PNG_upng
+cd HackBGRT_PNG_upng
 
 # Download gnu-efi
 wget https://jaist.dl.sourceforge.net/project/gnu-efi/gnu-efi-3.0.12.tar.bz2
