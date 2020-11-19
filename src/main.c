@@ -382,19 +382,17 @@ static BMP* LoadPNG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	BMP* bmp = 0;
 	if (!path) {
-		BS->AllocatePool(EfiBootServicesData, 58, (void**) &bmp);
+		bmp = init_bmp(1, 1);
 		if (!bmp) {
 			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
 			BS->Stall(1000000);
 			return 0;
 		}
+		// Black dot
 		CopyMem(
-			bmp,
-			"\x42\x4d\x3a\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00\x28\x00"
-			"\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x18\x00\x00\x00"
-			"\x00\x00\x04\x00\x00\x00\x13\x0b\x00\x00\x13\x0b\x00\x00\x00\x00"
-			"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-			58
+			((UINT8*)bmp)+54,
+			"\x00\x00\x00\x00",
+			4
 		);
 		return bmp;
 	}
