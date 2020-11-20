@@ -342,44 +342,83 @@ static void* decode_png(void* buffer, UINTN size)
 	Debug(L"size: %ux%ux%u (%u)\n", width, height, upng_get_bpp(upng), upng_get_size(upng));
 	Debug(L"format: %u\n", upng_get_format(upng));
 
+	int decode_type = 0;
 	if (upng_get_format(upng) == UPNG_RGB8 || upng_get_format(upng) == UPNG_RGBA8) {
+		// 8-bit RGB
+		decode_type = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_RGB16 || upng_get_format(upng) == UPNG_RGBA16) {
+		// 16-bit RGB
+		decode_type = 2;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE8 || upng_get_format(upng) == UPNG_LUMINANCE_ALPHA8) {
+		// 8-bit Greyscale
+		decode_type = 3;
+	}
 
-		const unsigned char* upng_buffer = upng_get_buffer(upng);
-		UINT32 bmp_width = ((width * 3) + (width & 3));
-		for (y = 0; y != height; ++y) {
-			for (x = 0; x != width; ++x) {
-				UINT32 bmp_pos = bmp_width * (height - y - 1) + (x * 3) + 54;
-				UINT32 png_pos = (y * width + x) * depth;
+	if (!decode_type) {
+		Print(L"HackBGRT: No Support PNG format %u\n", upng_get_format(upng));
+		upng_free(upng);
+		return 0;
+	}
+
+	const unsigned char* upng_buffer = upng_get_buffer(upng);
+	UINT32 bmp_width = ((width * 3) + (width & 3));
+	for (y = 0; y != height; ++y) {
+		for (x = 0; x != width; ++x) {
+			UINT32 bmp_pos = bmp_width * (height - y - 1) + (x * 3) + 54;
+			UINT32 png_pos = (y * width + x) * depth;
+
+			if (decode_type == 1) {
+				// 8-bit RGB
 				for (d = 0; d < 3; ++d) {
 					// B,G,R
 					UINT8 c = upng_buffer[png_pos + (3 - d - 1)];
 					((UINT8*)bmp)[bmp_pos] = c;
 					++bmp_pos;
 				}
-
-				// Debug Plot Dot pixel
-				if (config.debug && 0) {
-					UINT8 r = ((UINT8*)bmp)[bmp_pos - 1];
-					UINT8 g = ((UINT8*)bmp)[bmp_pos - 2];
-					UINT8 b = ((UINT8*)bmp)[bmp_pos - 3];
-					plot_dot(x, y, r, g, b);
+			} else
+			if (decode_type == 2) {
+				// 16-bit RGB
+				for (d = 0; d < 3; ++d) {
+					// B,G,R Upper 8bit
+					// or
+					// UINT16 maxval = 0xFFFF
+					// UINT8 c = (uint16_val * 255 + maxval / 2) / maxval
+					UINT8 c = upng_buffer[png_pos + (6 - (d*2) - 1)];
+					((UINT8*)bmp)[bmp_pos] = c;
+					++bmp_pos;
 				}
+			} else
+			if (decode_type == 3) {
+				// 8-bit Greyscale
+				UINT8 c = upng_buffer[png_pos];
 
-				// Debug
-				if ((x % 32) || (y % 32) || (x > 256) || (y > 256))
-					continue;
-
-				// B,G,R
-				UINT8 r = ((UINT8*)bmp)[--bmp_pos];
-				UINT8 g = ((UINT8*)bmp)[--bmp_pos];
-				UINT8 b = ((UINT8*)bmp)[--bmp_pos];
-				Debug(L"HackBGRT: bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
+				// B,G,R Grayscale 8bit
+				((UINT8*)bmp)[bmp_pos]   = c;
+				((UINT8*)bmp)[++bmp_pos] = c;
+				((UINT8*)bmp)[++bmp_pos] = c;
+				++bmp_pos;
 			}
+
+			// Debug Plot Dot pixel
+			if (config.debug && 0) {
+				UINT8 r = ((UINT8*)bmp)[bmp_pos - 1];
+				UINT8 g = ((UINT8*)bmp)[bmp_pos - 2];
+				UINT8 b = ((UINT8*)bmp)[bmp_pos - 3];
+				plot_dot(x, y, r, g, b);
+			}
+
+			// Debug
+			if ((x % 32) || (y % 32) || (x > 256) || (y > 256))
+				continue;
+
+			// B,G,R
+			UINT8 r = ((UINT8*)bmp)[--bmp_pos];
+			UINT8 g = ((UINT8*)bmp)[--bmp_pos];
+			UINT8 b = ((UINT8*)bmp)[--bmp_pos];
+			Debug(L"HackBGRT: bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
 		}
-	} else {
-		Print(L"HackBGRT: HackBGRT Support RGB8 or RGBA8 only (%u)\n", upng_get_format(upng));
-		upng_free(upng);
-		return 0;
 	}
 
 	// Frees the resources attached to a upng_t object
