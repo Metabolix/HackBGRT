@@ -8,10 +8,12 @@ rm OVMF-X64-r15214.zip
 
 # Create EFI area
 mkdir image
-cp HackBGRT_*.efi ./image
+rem cp HackBGRT_*.efi ./image
 
 mkdir image/EFI
 mkdir image/EFI/HackBGRT
+mkdir image/EFI/boot
+cp HackBGRT_*.efi ./image/EFI/boot/bootx64.efi
 
 # Enable Debug mode
 sed -i 's/debug=0/debug=1/' config.txt
@@ -58,7 +60,7 @@ Press any key to exit.
 
 --------
 FS0:\> cls
-FS0:\> HackBGRT_PNG_x86_64.efi
+FS0:\> HackBGRT_MULTI_x86_64.efi
 Looking for resolution 2147483647x2147483647...
 Found resolution 1024x768.
 RSDP: revision = 2, OEM ID = OVMF
@@ -66,7 +68,7 @@ RSDP: revision = 2, OEM ID = OVMF
  - ACPI table: BGRT, revision = 0, OEM ID = Mtblx*
  -> Returning this one for later use.
 HackBGRT: Loading \EFI\HackBGRT\PngSuite.png.
-HackBGRT: Filename Len 26, Last Char g.
+HackBGRT: Filename Len 26, Last Char n.
 HackBGRT: Loading PNG \EFI\HackBGRT\PngSuite.png.
 HackBGRT: init_bmp() (256 x 256).
 HackBGRT: init_bmp() AllocatePool 196662.
@@ -81,61 +83,62 @@ HackBGRT: bmp ( 160,    0) #000000.
 HackBGRT: bmp ( 192,    0) #000000.
 HackBGRT: bmp ( 224,    0) #000000.
 HackBGRT: bmp (   0,   32) #400000.
-HackBGRT: bmp (  32,   32) #402020.
-HackBGRT: bmp (  64,   32) #404040.
-HackBGRT: bmp (  96,   32) #204040.
-HackBGRT: bmp ( 128,   32) #004040.
+HackBGRT: bmp (  32,   32) #402000.
+HackBGRT: bmp (  64,   32) #404000.
+HackBGRT: bmp (  96,   32) #204000.
+HackBGRT: bmp ( 128,   32) #004000.
 HackBGRT: bmp ( 160,   32) #004040.
-HackBGRT: bmp ( 192,   32) #000000.
-HackBGRT: bmp ( 224,   32) #400000.
+HackBGRT: bmp ( 192,   32) #000040.
+HackBGRT: bmp ( 224,   32) #400040.
 HackBGRT: bmp (   0,   64) #800000.
-HackBGRT: bmp (  32,   64) #804040.
-HackBGRT: bmp (  64,   64) #808080.
-HackBGRT: bmp (  96,   64) #408080.
-HackBGRT: bmp ( 128,   64) #008080.
+HackBGRT: bmp (  32,   64) #804000.
+HackBGRT: bmp (  64,   64) #808000.
+HackBGRT: bmp (  96,   64) #408000.
+HackBGRT: bmp ( 128,   64) #008000.
 HackBGRT: bmp ( 160,   64) #008080.
-HackBGRT: bmp ( 192,   64) #000000.
-HackBGRT: bmp ( 224,   64) #800000.
+HackBGRT: bmp ( 192,   64) #000080.
+HackBGRT: bmp ( 224,   64) #800080.
 HackBGRT: bmp (   0,   96) #C00000.
-HackBGRT: bmp (  32,   96) #C06060.
-HackBGRT: bmp (  64,   96) #C0C0C0.
-HackBGRT: bmp (  96,   96) #60C0C0.
-HackBGRT: bmp ( 128,   96) #00C0C0.
+HackBGRT: bmp (  32,   96) #C06000.
+HackBGRT: bmp (  64,   96) #C0C000.
+HackBGRT: bmp (  96,   96) #60C000.
+HackBGRT: bmp ( 128,   96) #00C000.
 HackBGRT: bmp ( 160,   96) #00C0C0.
-HackBGRT: bmp ( 192,   96) #000000.
-HackBGRT: bmp ( 224,   96) #C00000.
+HackBGRT: bmp ( 192,   96) #0000C0.
+HackBGRT: bmp ( 224,   96) #C000C0.
 HackBGRT: bmp (   0,  128) #FF0101.
-HackBGRT: bmp (  32,  128) #FF8080.
-HackBGRT: bmp (  64,  128) #FFFFFF.
-HackBGRT: bmp (  96,  128) #80FFFF.
-HackBGRT: bmp ( 128,  128) #01FFFF.
+HackBGRT: bmp (  32,  128) #FF8001.
+HackBGRT: bmp (  64,  128) #FFFF01.
+HackBGRT: bmp (  96,  128) #80FF01.
+HackBGRT: bmp ( 128,  128) #01FF01.
 HackBGRT: bmp ( 160,  128) #01FFFF.
-HackBGRT: bmp ( 192,  128) #010101.
-HackBGRT: bmp ( 224,  128) #FF0101.
+HackBGRT: bmp ( 192,  128) #0101FF.
+HackBGRT: bmp ( 224,  128) #FF01FF.
 HackBGRT: bmp (   0,  160) #FF4141.
-HackBGRT: bmp (  32,  160) #FFA0A0.
-HackBGRT: bmp (  64,  160) #FFFFFF.
-HackBGRT: bmp (  96,  160) #A0FFFF.
-HackBGRT: bmp ( 128,  160) #41FFFF.
+HackBGRT: bmp (  32,  160) #FFA041.
+HackBGRT: bmp (  64,  160) #FFFF41.
+HackBGRT: bmp (  96,  160) #A0FF41.
+HackBGRT: bmp ( 128,  160) #41FF41.
 HackBGRT: bmp ( 160,  160) #41FFFF.
-HackBGRT: bmp ( 192,  160) #414141.
-HackBGRT: bmp ( 224,  160) #FF4141.
+HackBGRT: bmp ( 192,  160) #4141FF.
+HackBGRT: bmp ( 224,  160) #FF41FF.
 HackBGRT: bmp (   0,  192) #FF8181.
-HackBGRT: bmp (  32,  192) #FFC0C0.
-HackBGRT: bmp (  64,  192) #FFFFFF.
-HackBGRT: bmp (  96,  192) #C0FFFF.
-HackBGRT: bmp ( 128,  192) #81FFFF.
+HackBGRT: bmp (  32,  192) #FFC081.
+HackBGRT: bmp (  64,  192) #FFFF81.
+HackBGRT: bmp (  96,  192) #C0FF81.
+HackBGRT: bmp ( 128,  192) #81FF81.
 HackBGRT: bmp ( 160,  192) #81FFFF.
-HackBGRT: bmp ( 192,  192) #818181.
-HackBGRT: bmp ( 224,  192) #FF8181.
+HackBGRT: bmp ( 192,  192) #8181FF.
+HackBGRT: bmp ( 224,  192) #FF81FF.
 HackBGRT: bmp (   0,  224) #FFC1C1.
-HackBGRT: bmp (  32,  224) #FFE0E0.
-HackBGRT: bmp (  64,  224) #FFFFFF.
-HackBGRT: bmp (  96,  224) #E0FFFF.
-HackBGRT: bmp ( 128,  224) #C1FFFF.
+HackBGRT: bmp (  32,  224) #FFE0C1.
+HackBGRT: bmp (  64,  224) #FFFFC1.
+HackBGRT: bmp (  96,  224) #E0FFC1.
+HackBGRT: bmp ( 128,  224) #C1FFC1.
 HackBGRT: bmp ( 160,  224) #C1FFFF.
-HackBGRT: bmp ( 192,  224) #C1C1C1.
-HackBGRT: bmp ( 224,  224) #FFC1C1.
+HackBGRT: bmp ( 192,  224) #C1C1FF.
+HackBGRT: bmp ( 224,  224) #FFC1FF.
+HackBGRT: Load Success \EFI\HackBGRT\PngSuite.png.
 HackBGRT: BMP at (384, 128).
 RSDP: revision = 2, OEM ID = OVMF
 * XSDT: OEM ID = OVMF  , entry count = 4
@@ -147,7 +150,7 @@ HackBGRT: Loading application \EFI\HackBGRT\bootmgfw-original.efi.
 HackBGRT: Also failed to load application \EFI\HackBGRT\bootmgfw-original.efi.
 HackBGRT has failed. Use parameter debug=1 for details.
 Get a Windows install disk or a recovery disk to fix your boot.
-HackBGRT version: v1.5.1-9-g6f0b028
+HackBGRT version: 2020_1120_multi-3-ged36697
 Press any key to exit.
 
 --------
