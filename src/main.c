@@ -408,6 +408,7 @@ static void* decode_png(void* buffer, UINTN size)
 	const int shift_1bit[] = {7, 6, 5, 4, 3, 2, 1, 0};
 	int shift = 0;
 	UINT8 c = 0;
+	UINT16 u16 = 0;
 
 	const unsigned char* upng_buffer = upng_get_buffer(upng);
 	UINT32 bmp_width = ((width * 3) + (width & 3));
@@ -428,11 +429,17 @@ static void* decode_png(void* buffer, UINTN size)
 			if (decode_type == 2) {
 				// 16-bit RGB
 				for (d = 0; d < 3; ++d) {
-					// B,G,R Upper 8bit
-					// or
-					// UINT16 maxval = 0xFFFF
-					// UINT8 c = (uint16_val * 255 + maxval / 2) / maxval
-					c = upng_buffer[png_pos + (6 - (d*2) - 2)];
+					// // B,G,R Upper 8bit
+					// c = upng_buffer[png_pos + (6 - (d*2) - 2)];
+					// B,G,R 16bit to 8bit Nearest-Neighbor method
+					u16 = upng_buffer[png_pos + (6 - (d*2) - 2)];
+					u16 <<= 8;
+					u16 |= upng_buffer[png_pos + (6 - (d*2) - 1)];
+					if (u16 >= 0xFF7F) {
+						c = 0xFF;
+					} else {
+						c = (u16 + 0x80) / 0x101;
+					}
 					((UINT8*)bmp)[bmp_pos] = c;
 					++bmp_pos;
 				}
