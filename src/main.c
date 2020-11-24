@@ -209,6 +209,343 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 }
 
 /**
+ * Plot Dot pixel
+ */
+static void plot_dot(const uint32_t x, const uint32_t y, const UINT8 r, const UINT8 g, const UINT8 b)
+{
+	EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = GOP();
+	if (!gop) {
+		// Debug(L"GOP not found!\n");
+		return;
+	}
+
+	const uint32_t w = 1, h = 1;
+	const UINTN delta = w * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL);
+
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL pixel;
+	pixel.Blue  = b;
+	pixel.Green = g;
+	pixel.Red   = r;
+	pixel.Reserved = 0x00;
+
+	gop->Blt(gop,
+		&pixel,					// Dot data
+		EfiBltBufferToVideo,	// Draw dot
+		0, 0,					// UINTN SourceX, SourceY
+		x, y,					// UINTN DestinationX, DestinationY
+		w, h,					// UINTN Width, Height
+		delta					// UINTN Delta
+		);
+}
+
+/**
+ * Load a PNG image file
+ *
+ * @param root_dir The root directory for loading a PNG.
+ * @param path The PNG path within the root directory.
+ * @return The loaded BMP, or 0 if not available.
+ */
+#include "../my_efilib/my_efilib.h"
+#include "../upng/upng.h"
+
+static void* init_bmp(uint32_t w, uint32_t h)
+{
+	BMP* bmp = 0;
+
+	Debug(L"HackBGRT: init_bmp() (%d x %d).\n", w, h);
+
+	// 3 = RGB 3byte
+	// 54 = 24bit BMP has 54byte header
+	// Padding for 4 byte alignment
+	// const int pad = (w & 3);
+	const UINT32 size = ((w * 3) + (w & 3)) * h + 54;
+	Debug(L"HackBGRT: init_bmp() AllocatePool %ld.\n", size);
+	BS->AllocatePool(EfiBootServicesData, size, (void*)&bmp);
+	if (!bmp) return 0;
+
+	// BI_RGB 24bit
+	CopyMem(
+		bmp,
+		"\x42\x4d"
+		"\x00\x00\x00\x00"
+		"\x00\x00"
+		"\x00\x00"
+		"\x36\x00\x00\x00"
+		"\x28\x00\x00\x00"
+		"\x00\x00\x00\x00"
+		"\x00\x00\x00\x00"
+		"\x01\x00"
+		"\x18\x00"
+		"\x00\x00\x00\x00"
+		"\x00\x00\x00\x00"
+		"\x13\x0b\x00\x00"
+		"\x13\x0b\x00\x00"
+		"\x00\x00\x00\x00"
+		"\x00\x00\x00\x00",
+		54
+	);
+
+	// Windows Bitmap Byte Order = Little Endian
+	bmp->file_size = DWORD_TO_BYTES_LE(size);
+	bmp->width  = DWORD_TO_BYTES_LE(w);
+	bmp->height = DWORD_TO_BYTES_LE(h);
+	bmp->biSizeImage = DWORD_TO_BYTES_LE(size - 54);
+
+	return bmp;
+}
+
+
+static void* decode_png(void* buffer, UINTN size)
+{
+	// upng
+	upng_t* upng;
+	unsigned width, height, depth;
+	unsigned x, y, d;
+
+	upng = upng_new_from_bytes(buffer, size);
+	if (!upng) {
+		Print(L"HackBGRT: Failed to upng NULL\n");
+		return 0;
+	}
+
+	if (upng_get_error(upng) != UPNG_EOK) {
+		Print(L"HackBGRT: Failed to upng %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
+		upng_free(upng);
+		return 0;
+	}
+
+	// Reads just the header, sets image properties
+	if (upng_header(upng) != UPNG_EOK) {
+		Print(L"HackBGRT: Failed to upng_header %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
+		upng_free(upng);
+		return 0;
+	}
+
+	// Decodes image data
+	if (upng_decode(upng) != UPNG_EOK) {
+		Print(L"HackBGRT: Failed to upng_decode %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
+		upng_free(upng);
+		return 0;
+	}
+
+	width  = upng_get_width(upng);
+	height = upng_get_height(upng);
+	depth  = upng_get_bpp(upng) / 8;
+	if (depth < 1) depth = 1;
+
+	BMP* bmp = init_bmp(width, height);
+	if (!bmp) {
+		Print(L"HackBGRT: Failed to init_bmp\n");
+		upng_free(upng);
+		return 0;
+	}
+
+	Debug(L"size: %ux%ux%u (%u)\n", width, height, upng_get_bpp(upng), upng_get_size(upng));
+	Debug(L"format: %u\n", upng_get_format(upng));
+
+	int decode_type = 0;
+	int is_index_color = 0;
+	if (upng_get_format(upng) == UPNG_RGB8 || upng_get_format(upng) == UPNG_RGBA8) {
+		// 8-bit RGB
+		decode_type = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_RGB16 || upng_get_format(upng) == UPNG_RGBA16) {
+		// 16-bit RGB
+		decode_type = 2;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE8 || upng_get_format(upng) == UPNG_LUMINANCE_ALPHA8) {
+		// 8-bit Greyscale
+		decode_type = 3;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX8) {
+		// 8-bit Index Color
+		decode_type = 3;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX4) {
+		// 4-bit Index Color
+		decode_type = 4;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX2) {
+		// 2-bit Index Color
+		decode_type = 5;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX1) {
+		// 1-bit Index Color
+		decode_type = 6;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE4) {
+		// 4-bit Greyscale
+		decode_type = 4;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE2) {
+		// 2-bit Greyscale
+		decode_type = 5;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE1) {
+		// 1-bit Greyscale B/W
+		decode_type = 6;
+	}
+
+	if (!decode_type) {
+		Print(L"HackBGRT: No Support PNG format %u\n", upng_get_format(upng));
+		upng_free(upng);
+		return 0;
+	}
+
+	const unsigned char* upng_palette = upng_get_palette(upng);
+	if (is_index_color && !upng_palette) {
+		Print(L"HackBGRT: Error No PLTE chunk Index Color Palette\n");
+		upng_free(upng);
+		return 0;
+	}
+
+	const int shift_4bit[] = {4, 0};
+	const int shift_2bit[] = {6, 4, 2, 0};
+	const int shift_1bit[] = {7, 6, 5, 4, 3, 2, 1, 0};
+	int shift = 0;
+	UINT8 c = 0;
+	UINT16 u16 = 0;
+
+	const unsigned char* upng_buffer = upng_get_buffer(upng);
+	UINT32 bmp_width = ((width * 3) + (width & 3));
+	for (y = 0; y != height; ++y) {
+		for (x = 0; x != width; ++x) {
+			UINT32 bmp_pos = bmp_width * (height - y - 1) + (x * 3) + 54;
+			UINT32 png_pos = (y * width + x) * depth;
+
+			if (decode_type == 1) {
+				// 8-bit RGB
+				for (d = 0; d < 3; ++d) {
+					// B,G,R
+					c = upng_buffer[png_pos + (3 - d - 1)];
+					((UINT8*)bmp)[bmp_pos] = c;
+					++bmp_pos;
+				}
+			} else
+			if (decode_type == 2) {
+				// 16-bit RGB
+				for (d = 0; d < 3; ++d) {
+					// // B,G,R Upper 8bit
+					// c = upng_buffer[png_pos + (6 - (d*2) - 2)];
+					// B,G,R 16bit to 8bit Nearest-Neighbor method
+					u16 = upng_buffer[png_pos + (6 - (d*2) - 2)];
+					u16 <<= 8;
+					u16 |= upng_buffer[png_pos + (6 - (d*2) - 1)];
+					if (u16 >= 0xFF7F) {
+						c = 0xFF;
+					} else {
+						c = (u16 + 0x80) / 0x101;
+					}
+					((UINT8*)bmp)[bmp_pos] = c;
+					++bmp_pos;
+				}
+			} else
+			if (decode_type >= 3) {
+				if (decode_type == 3) {
+					// 8-bit
+					c = upng_buffer[png_pos];
+				} else
+				if (decode_type == 4) {
+					// 4-bit
+					shift = png_pos & 1;
+					png_pos >>= 1;
+					c = upng_buffer[png_pos] >> shift_4bit[shift];
+					c = (c & 0x0F);
+					if (!is_index_color) {
+						// B,G,R Grayscale 4bit
+						c = c * 0x11;
+					}
+				} else
+				if (decode_type == 5) {
+					// 2-bit
+					shift = png_pos & 3;
+					png_pos >>= 2;
+					c = upng_buffer[png_pos] >> shift_2bit[shift];
+					c = (c & 0x03);
+					if (!is_index_color) {
+						// B,G,R Grayscale 2bit
+						c = c * 0x55;
+					}
+				} else
+				if (decode_type == 6) {
+					// 1-bit
+					shift = png_pos & 7;
+					png_pos >>= 3;
+					c = upng_buffer[png_pos] >> shift_1bit[shift];
+					c = (c & 0x01);
+					if (!is_index_color) {
+						// B,G,R Grayscale B/W
+						c = c * 0xFF;
+					}
+				}
+
+				if (is_index_color) {
+					// B,G,R Palette
+					((UINT8*)bmp)[bmp_pos]   = upng_palette[c * 3 + 2];
+					((UINT8*)bmp)[++bmp_pos] = upng_palette[c * 3 + 1];
+					((UINT8*)bmp)[++bmp_pos] = upng_palette[c * 3];
+				} else {
+					// B,G,R Grayscale 8bit
+					((UINT8*)bmp)[bmp_pos]   = c;
+					((UINT8*)bmp)[++bmp_pos] = c;
+					((UINT8*)bmp)[++bmp_pos] = c;
+				}
+				++bmp_pos;
+			}
+
+			// Debug Plot Dot pixel
+			if (config.debug && 0) {
+				UINT8 r = ((UINT8*)bmp)[bmp_pos - 1];
+				UINT8 g = ((UINT8*)bmp)[bmp_pos - 2];
+				UINT8 b = ((UINT8*)bmp)[bmp_pos - 3];
+				plot_dot(x, y, r, g, b);
+			}
+
+			// Debug
+			if ((x % 32) || (y % 32) || (x > 256) || (y > 256))
+				continue;
+
+			// B,G,R
+			UINT8 r = ((UINT8*)bmp)[--bmp_pos];
+			UINT8 g = ((UINT8*)bmp)[--bmp_pos];
+			UINT8 b = ((UINT8*)bmp)[--bmp_pos];
+			Debug(L"HackBGRT: bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
+		}
+	}
+
+	// Frees the resources attached to a upng_t object
+	upng_free(upng);
+
+	return bmp;
+}
+
+static BMP* LoadPNG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
+	void* buffer = 0;
+	Debug(L"HackBGRT: Loading PNG %s.\n", path);
+	UINTN size;
+	buffer = LoadFile(root_dir, path, &size);
+	if (!buffer) {
+		Print(L"HackBGRT: Failed to load PNG (%s)!\n", path);
+		BS->Stall(1000000);
+		return 0;
+	}
+
+	BMP* bmp = decode_png(buffer, size);
+	if (!bmp) {
+		FreePool(buffer);
+		Print(L"HackBGRT: Failed to decoce PNG (%s)!\n", path);
+		BS->Stall(1000000);
+		return 0;
+	}
+
+	return bmp;
+}
+
+/**
  * Load a bitmap or generate a black one.
  *
  * @param root_dir The root directory for loading a BMP.
@@ -218,24 +555,30 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	BMP* bmp = 0;
 	if (!path) {
-		BS->AllocatePool(EfiBootServicesData, 58, (void**) &bmp);
+		bmp = init_bmp(1, 1);
 		if (!bmp) {
 			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
 			BS->Stall(1000000);
 			return 0;
 		}
+		// Black dot
 		CopyMem(
-			bmp,
-			"\x42\x4d\x3a\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00\x28\x00"
-			"\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x18\x00\x00\x00"
-			"\x00\x00\x04\x00\x00\x00\x13\x0b\x00\x00\x13\x0b\x00\x00\x00\x00"
-			"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-			58
+			((UINT8*)bmp)+54,
+			"\x00\x00\x00\x00",
+			4
 		);
 		return bmp;
 	}
 	Debug(L"HackBGRT: Loading %s.\n", path);
-	bmp = LoadFile(root_dir, path, 0);
+
+	UINTN len = StrLen(path);
+	CHAR16 last_char = path[len -1];
+	Debug(L"HackBGRT: Filename Len %d, Last Char %c.\n", (int)len, last_char);
+	if (last_char == 'g' || last_char == 'G') {
+		bmp = LoadPNG(root_dir, path);
+	} else {
+		bmp = LoadFile(root_dir, path, 0);
+	}
 	if (!bmp) {
 		Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
 		BS->Stall(1000000);

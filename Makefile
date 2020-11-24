@@ -3,8 +3,10 @@
 CROSS_COMPILE =
 # PREFIX=/usr/local/
 PREFIX = ./gnu-efi/usr/local/
-TARGET = HackBGRT_$(ARCH)
+TARGET = HackBGRT_PNG_$(ARCH)
 _OBJS = main.o config.o types.o util.o
+_OBJS += upng.o
+_OBJS += my_efilib.o
 ODIR = obj
 SDIR = src
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
@@ -76,6 +78,14 @@ $(TARGET).so: $(OBJS)
 		-T $(LDSCRIPT)
 
 ./obj/%.o: ./src/%.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# PNG upng
+./obj/%.o: ./upng/%.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# my_efilib
+./obj/%.o: ./my_efilib/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # clean rule
