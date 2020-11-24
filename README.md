@@ -4,6 +4,7 @@ How to build HackBGRT.efi using Windows 10 WSL Debian
 * Windows_WSL_Debian_1st.txt
 * Windows_WSL_Debian_2nd.txt
 * Windows_WSL_Debian_3rd.txt
+* Install.txt
 
 Caution:  
 Build only the 64-bit version .  
