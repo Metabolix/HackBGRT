@@ -919,6 +919,14 @@ static void* decode_jpeg(void* buffer, UINTN size)
 				++bmp_pos;
 			}
 
+			// Debug Plot Dot pixel
+			if (config.debug && 0) {
+				UINT8 r = ((UINT8*)bmp)[bmp_pos - 1];
+				UINT8 g = ((UINT8*)bmp)[bmp_pos - 2];
+				UINT8 b = ((UINT8*)bmp)[bmp_pos - 3];
+				plot_dot(x, y, r, g, b);
+			}
+
 			// Debug
 			if ((x % 32) || (y % 32) || (x > 256) || (y > 256))
 				continue;
