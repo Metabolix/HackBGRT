@@ -1,0 +1,45 @@
+I make silent install batch file for Windows system .
+It works fine in Windows 10 20H2 .
+
+You need to edit config.txt properly in advance .
+
+Execute following Command in Command Prompt(cmd.exe) as Administrator .
+
+http://www.neko.ne.jp/~freewing/software/windows_10_customize_boot_logo_hackbgrt/
+
+https://github.com/Metabolix/HackBGRT/issues/49
+
+----
+rem Drive name that does not currently exist in the system .
+rem Generally "Y:" drives usually does not exist .
+set EFI_DRIVE_LETTER=Y
+set HACK_BGRT_PATH=%EFI_DRIVE_LETTER%:\EFI\HackBGRT
+set HackBGRT_EFI=bootx64.efi
+
+mountvol %EFI_DRIVE_LETTER%: /S
+
+dir %EFI_DRIVE_LETTER%:
+
+mkdir %HACK_BGRT_PATH%
+cd %HACK_BGRT_PATH%
+dir %EFI_DRIVE_LETTER%:
+
+rem You have to need Edit config.txt , Before copying it .
+rem ex. boot=\EFI\Microsoft\Boot\bootmgfw.efi
+copy config.txt %EFI_DRIVE_LETTER%:
+
+rem You change to your favorite image file .
+copy splash.bmp %EFI_DRIVE_LETTER%:
+
+rem for 64bit System HackBGRT bootx64.efi
+copy %HackBGRT_EFI% %EFI_DRIVE_LETTER%:
+
+dir %EFI_DRIVE_LETTER%:
+
+mountvol %EFI_DRIVE_LETTER%: /D
+
+rem Change boot loader to \EFI\HackBGRT\bootx64.efi
+bcdedit /set {bootmgr} path \EFI\HackBGRT\%HackBGRT_EFI%
+bcdedit /set {bootmgr} description "HackBGRT Boot Manager"
+
+rem Enjoy HackBGRT !!
