@@ -15,6 +15,11 @@ UEFIアプリケーション開発環境を Windowsの WSL環境で構築して 
 http://www.neko.ne.jp/~freewing/software/uefi_bios_hack/  
 
 ---
+## Can't Disable Secure Boot ?
+Super UEFIinSecureBoot Disk  
+https://github.com/ValdikSS/Super-UEFIinSecureBoot-Disk  
+
+---
 # HackBGRT
 
 HackBGRT is intended as a boot logo changer for UEFI-based Windows systems.
