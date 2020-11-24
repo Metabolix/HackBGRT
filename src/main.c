@@ -331,6 +331,7 @@ static void* decode_png(void* buffer, UINTN size)
 	width  = upng_get_width(upng);
 	height = upng_get_height(upng);
 	depth  = upng_get_bpp(upng) / 8;
+	if (depth < 1) depth = 1;
 
 	BMP* bmp = init_bmp(width, height);
 	if (!bmp) {
@@ -343,6 +344,7 @@ static void* decode_png(void* buffer, UINTN size)
 	Debug(L"format: %u\n", upng_get_format(upng));
 
 	int decode_type = 0;
+	int is_index_color = 0;
 	if (upng_get_format(upng) == UPNG_RGB8 || upng_get_format(upng) == UPNG_RGBA8) {
 		// 8-bit RGB
 		decode_type = 1;
@@ -354,6 +356,38 @@ static void* decode_png(void* buffer, UINTN size)
 	if (upng_get_format(upng) == UPNG_LUMINANCE8 || upng_get_format(upng) == UPNG_LUMINANCE_ALPHA8) {
 		// 8-bit Greyscale
 		decode_type = 3;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX8) {
+		// 8-bit Index Color
+		decode_type = 3;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX4) {
+		// 4-bit Index Color
+		decode_type = 4;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX2) {
+		// 2-bit Index Color
+		decode_type = 5;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_INDEX1) {
+		// 1-bit Index Color
+		decode_type = 6;
+		is_index_color = 1;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE4) {
+		// 4-bit Greyscale
+		decode_type = 4;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE2) {
+		// 2-bit Greyscale
+		decode_type = 5;
+	} else
+	if (upng_get_format(upng) == UPNG_LUMINANCE1) {
+		// 1-bit Greyscale B/W
+		decode_type = 6;
 	}
 
 	if (!decode_type) {
@@ -361,6 +395,19 @@ static void* decode_png(void* buffer, UINTN size)
 		upng_free(upng);
 		return 0;
 	}
+
+	const unsigned char* upng_palette = upng_get_palette(upng);
+	if (is_index_color && !upng_palette) {
+		Print(L"HackBGRT: Error No PLTE chunk Index Color Palette\n");
+		upng_free(upng);
+		return 0;
+	}
+
+	const int shift_4bit[] = {4, 0};
+	const int shift_2bit[] = {6, 4, 2, 0};
+	const int shift_1bit[] = {7, 6, 5, 4, 3, 2, 1, 0};
+	int shift = 0;
+	UINT8 c = 0;
 
 	const unsigned char* upng_buffer = upng_get_buffer(upng);
 	UINT32 bmp_width = ((width * 3) + (width & 3));
@@ -373,7 +420,7 @@ static void* decode_png(void* buffer, UINTN size)
 				// 8-bit RGB
 				for (d = 0; d < 3; ++d) {
 					// B,G,R
-					UINT8 c = upng_buffer[png_pos + (3 - d - 1)];
+					c = upng_buffer[png_pos + (3 - d - 1)];
 					((UINT8*)bmp)[bmp_pos] = c;
 					++bmp_pos;
 				}
@@ -385,19 +432,61 @@ static void* decode_png(void* buffer, UINTN size)
 					// or
 					// UINT16 maxval = 0xFFFF
 					// UINT8 c = (uint16_val * 255 + maxval / 2) / maxval
-					UINT8 c = upng_buffer[png_pos + (6 - (d*2) - 1)];
+					c = upng_buffer[png_pos + (6 - (d*2) - 2)];
 					((UINT8*)bmp)[bmp_pos] = c;
 					++bmp_pos;
 				}
 			} else
-			if (decode_type == 3) {
-				// 8-bit Greyscale
-				UINT8 c = upng_buffer[png_pos];
+			if (decode_type >= 3) {
+				if (decode_type == 3) {
+					// 8-bit
+					c = upng_buffer[png_pos];
+				} else
+				if (decode_type == 4) {
+					// 4-bit
+					shift = png_pos & 1;
+					png_pos >>= 1;
+					c = upng_buffer[png_pos] >> shift_4bit[shift];
+					c = (c & 0x0F);
+					if (!is_index_color) {
+						// B,G,R Grayscale 4bit
+						c = c * 0x11;
+					}
+				} else
+				if (decode_type == 5) {
+					// 2-bit
+					shift = png_pos & 3;
+					png_pos >>= 2;
+					c = upng_buffer[png_pos] >> shift_2bit[shift];
+					c = (c & 0x03);
+					if (!is_index_color) {
+						// B,G,R Grayscale 2bit
+						c = c * 0x55;
+					}
+				} else
+				if (decode_type == 6) {
+					// 1-bit
+					shift = png_pos & 7;
+					png_pos >>= 3;
+					c = upng_buffer[png_pos] >> shift_1bit[shift];
+					c = (c & 0x01);
+					if (!is_index_color) {
+						// B,G,R Grayscale B/W
+						c = c * 0xFF;
+					}
+				}
 
-				// B,G,R Grayscale 8bit
-				((UINT8*)bmp)[bmp_pos]   = c;
-				((UINT8*)bmp)[++bmp_pos] = c;
-				((UINT8*)bmp)[++bmp_pos] = c;
+				if (is_index_color) {
+					// B,G,R Palette
+					((UINT8*)bmp)[bmp_pos]   = upng_palette[c * 3 + 2];
+					((UINT8*)bmp)[++bmp_pos] = upng_palette[c * 3 + 1];
+					((UINT8*)bmp)[++bmp_pos] = upng_palette[c * 3];
+				} else {
+					// B,G,R Grayscale 8bit
+					((UINT8*)bmp)[bmp_pos]   = c;
+					((UINT8*)bmp)[++bmp_pos] = c;
+					((UINT8*)bmp)[++bmp_pos] = c;
+				}
 				++bmp_pos;
 			}
 
