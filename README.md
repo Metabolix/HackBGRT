@@ -1,6 +1,22 @@
 # FREE WING mod version 2020/11
 
-How to build HackBGRT.efi using Windows 10 WSL Debian
+## HackBGRT_MULTI
+* Support PNG format image file  
+  (But not Support Interlaced image)  
+* Ofcourse also Support BMP format (^_^)  
+
+### Support PNG format image file using uPNG library .
+https://github.com/elanthis/upng  
+
+These formats supported:  
+  8-bit RGB, RGBA  
+  16-bit RGB, RGBA  
+  1,2,4,8-bit RGB INDEX Color Palette  
+  1,2,4,8-bit Greyscale  
+  8-bit Greyscale w/ 8-bit Alpha  
+<img src="https://raw.githubusercontent.com/FREEWING-JP/HackBGRT/test/add_upng/upng.jpg" alt="HackBGRT_MULTI Support PNG format image file using uPNG library ." title="HackBGRT_MULTI Support PNG format image file using uPNG library ." width="320" height="240">
+
+## How to build HackBGRT.efi using Windows 10 WSL Debian
 * Windows_WSL_Debian_1st.txt
 * Windows_WSL_Debian_2nd.txt
 * Windows_WSL_Debian_3rd.txt
