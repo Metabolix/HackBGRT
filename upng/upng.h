@@ -52,7 +52,11 @@ typedef enum upng_format {
 	UPNG_LUMINANCE_ALPHA1,
 	UPNG_LUMINANCE_ALPHA2,
 	UPNG_LUMINANCE_ALPHA4,
-	UPNG_LUMINANCE_ALPHA8
+	UPNG_LUMINANCE_ALPHA8,
+	UPNG_INDEX1,
+	UPNG_INDEX2,
+	UPNG_INDEX4,
+	UPNG_INDEX8
 } upng_format;
 
 typedef struct upng_t upng_t;
@@ -77,5 +81,6 @@ upng_format	upng_get_format		(const upng_t* upng);
 
 const unsigned char*	upng_get_buffer		(const upng_t* upng);
 unsigned				upng_get_size		(const upng_t* upng);
+const unsigned char*	upng_get_palette	(const upng_t* upng);
 
 #endif /*defined(UPNG_H)*/
