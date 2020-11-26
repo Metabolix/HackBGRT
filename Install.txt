@@ -14,7 +14,8 @@ rem Drive name that does not currently exist in the system .
 rem Generally "Y:" drives usually does not exist .
 set EFI_DRIVE_LETTER=Y
 set HACK_BGRT_PATH=%EFI_DRIVE_LETTER%:\EFI\HackBGRT
-set HackBGRT_EFI=bootx64.efi
+rem set HackBGRT_EFI=bootx64.efi
+set HackBGRT_EFI=HackBGRT_MULTI_x86_64.efi
 
 mountvol %EFI_DRIVE_LETTER%: /S
 
