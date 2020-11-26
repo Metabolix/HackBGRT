@@ -43,6 +43,11 @@ UEFIアプリケーション開発環境を Windowsの WSL環境で構築して 
 http://www.neko.ne.jp/~freewing/software/uefi_bios_hack/  
 
 ---
+## Convert Progressive JPEG to Baseline JPEG ?
+Converting Progressive JPEG Image file to Baseline JPEG Image file  
+https://github.com/FREEWING-JP/CheckAndConvertJpegFile  
+
+---
 ## Can't Disable Secure Boot ?
 Super UEFIinSecureBoot Disk  
 https://github.com/ValdikSS/Super-UEFIinSecureBoot-Disk  
