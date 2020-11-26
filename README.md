@@ -3,6 +3,8 @@
 ## HackBGRT_MULTI
 * Support PNG format image file  
   (But not Support Interlaced image)  
+* Support JPEG format image file  
+  (But not Support Progressive image)  
 * Ofcourse also Support BMP format (^_^)  
 
 ### Support PNG format image file using uPNG library .
@@ -15,6 +17,16 @@ These formats supported:
   1,2,4,8-bit Greyscale  
   8-bit Greyscale w/ 8-bit Alpha  
 <img src="https://raw.githubusercontent.com/FREEWING-JP/HackBGRT/test/add_upng/upng.jpg" alt="HackBGRT_MULTI Support PNG format image file using uPNG library ." title="HackBGRT_MULTI Support PNG format image file using uPNG library ." width="320" height="240">
+
+### Support JPEG format image file using picojpeg library .
+https://code.google.com/archive/p/picojpeg/  
+https://github.com/richgel999/picojpeg  
+
+These formats supported:  
+ SOF0 Baseline format only(not Support Progressive)  
+<img src="https://raw.githubusercontent.com/FREEWING-JP/HackBGRT/test/add_picojpeg/HackBGRT_MULTI_1280px-Burosch_Blue-only_Test_pattern_mit_erklaerung.jpg" alt="HackBGRT_MULTI Support JPEG format image file using picojpeg library ." title="HackBGRT_MULTI Support JPEG format image file using picojpeg library ." width="320" height="240">  
+https://commons.wikimedia.org/wiki/File:Burosch_Blue-only_Test_pattern_mit_erklaerung.jpg  
+1,280 × 720 pixels
 
 ## How to build HackBGRT.efi using Windows 10 WSL Debian
 * Windows_WSL_Debian_1st.txt
@@ -29,6 +41,11 @@ Because I don't know how to write a Makefile script .
 Reference:  
 UEFIアプリケーション開発環境を Windowsの WSL環境で構築して QEMU環境で動作確認する方法  
 http://www.neko.ne.jp/~freewing/software/uefi_bios_hack/  
+
+---
+## Convert Progressive JPEG to Baseline JPEG ?
+Converting Progressive JPEG Image file to Baseline JPEG Image file  
+https://github.com/FREEWING-JP/CheckAndConvertJpegFile  
 
 ---
 ## Can't Disable Secure Boot ?
