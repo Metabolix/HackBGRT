@@ -52,6 +52,8 @@ https://github.com/FREEWING-JP/CheckAndConvertJpegFile
 Super UEFIinSecureBoot Disk  
 https://github.com/ValdikSS/Super-UEFIinSecureBoot-Disk  
 
+rename HackBGRT_MULTI_x86_64.efi to grubx64_real.efi
+
 ---
 # HackBGRT
 
