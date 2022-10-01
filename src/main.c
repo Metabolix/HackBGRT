@@ -43,7 +43,7 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP(void) {
 static void SetResolution(int w, int h) {
 	EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = GOP();
 	if (!gop) {
-		Debug(L"GOP not found!\n");
+		Debug(L"GOP not found.\n");
 		return;
 	}
 	UINTN best_i = gop->Mode->Mode;
@@ -121,7 +121,7 @@ ACPI_SDT_HEADER* CreateXsdt(ACPI_SDT_HEADER* xsdt0, UINTN entries) {
 	UINT32 xsdt_len = sizeof(ACPI_SDT_HEADER) + entries * sizeof(UINT64);
 	BS->AllocatePool(EfiACPIReclaimMemory, xsdt_len, (void**)&xsdt);
 	if (!xsdt) {
-		Print(L"HackBGRT: Failed to allocate memory for XSDT.\n");
+		Print(L"ERROR: Failed to allocate memory for XSDT.\n");
 		return 0;
 	}
 	ZeroMem(xsdt, xsdt_len);
@@ -220,7 +220,7 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	if (!path) {
 		BS->AllocatePool(EfiBootServicesData, 58, (void**) &bmp);
 		if (!bmp) {
-			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
+			Print(L"ERROR: Failed to allocate a blank Bitmap.\n");
 			BS->Stall(1000000);
 			return 0;
 		}
@@ -237,7 +237,7 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	Debug(L"HackBGRT: Loading %s.\n", path);
 	bmp = LoadFile(root_dir, path, 0);
 	if (!bmp) {
-		Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
+		Print(L"ERROR: Failed to load the Bitmap (%s).\n", path);
 		BS->Stall(1000000);
 		return 0;
 	}
@@ -277,7 +277,7 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		// Replace missing = allocate new.
 		BS->AllocatePool(EfiACPIReclaimMemory, sizeof(*bgrt), (void**)&bgrt);
 		if (!bgrt) {
-			Print(L"HackBGRT: Failed to allocate memory for BGRT.\n");
+			Print(L"ERROR: Failed to allocate memory for BGRT.\n");
 			return;
 		}
 	}
@@ -316,7 +316,7 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 	// Set the position (manual, automatic, original).
 	bgrt->image_offset_x = SelectCoordinate(config.image_x, auto_x, old_x);
 	bgrt->image_offset_y = SelectCoordinate(config.image_y, auto_y, old_y);
-	Debug(L"HackBGRT: BMP at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
+	Debug(L"Bitmap at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
 
 	// Store this BGRT in the ACPI tables.
 	SetAcpiSdtChecksum(bgrt);
@@ -331,7 +331,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 
 	EFI_LOADED_IMAGE* image;
 	if (EFI_ERROR(BS->HandleProtocol(image_handle, &LoadedImageProtocol, (void**) &image))) {
-		Debug(L"HackBGRT: LOADED_IMAGE_PROTOCOL failed.\n");
+		Debug(L"ERROR: LOADED_IMAGE_PROTOCOL failed.\n");
 		goto fail;
 	}
 
@@ -341,9 +341,9 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	int argc = GetShellArgcArgv(image_handle, &argv);
 
 	if (argc <= 1) {
-		const CHAR16* config_path = L"\\EFI\\HackBGRT\\config.txt";
+		const CHAR16* config_path = L"\\EFI\\BGRT\\config.txt";
 		if (!ReadConfigFile(&config, root_dir, config_path)) {
-			Print(L"HackBGRT: No config, no command line!\n", config_path);
+			Print(L"ERROR: The configuration was not found.\n", config_path);
 			goto fail;
 		}
 	}
@@ -357,23 +357,23 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 
 	EFI_HANDLE next_image_handle = 0;
 	if (!config.boot_path) {
-		Print(L"HackBGRT: Boot path not specified.\n");
+		Print(L"ERROR: Boot path not specified.\n");
 	} else {
-		Debug(L"HackBGRT: Loading application %s.\n", config.boot_path);
+		Debug(L"Loading the bootloader %s.\n", config.boot_path);
 		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) config.boot_path);
 		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-			Print(L"HackBGRT: Failed to load application %s.\n", config.boot_path);
+			Print(L"ERROR: Failed to load the bootloader %s.\n", config.boot_path);
 		}
 	}
 	if (!next_image_handle) {
-		static CHAR16 default_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";
-		Debug(L"HackBGRT: Loading application %s.\n", default_boot_path);
+		static CHAR16 default_boot_path[] = L"\\EFI\\BGRT\\bootmgfw.efi";
+		Debug(L"Loading the bootloader %s.\n", default_boot_path);
 		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, default_boot_path);
 		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-			Print(L"HackBGRT: Also failed to load application %s.\n", default_boot_path);
+			Print(L"ERROR: Also failed to load the bootloader %s.\n", default_boot_path);
 			goto fail;
 		}
-		Print(L"HackBGRT: Reverting to %s.\n", default_boot_path);
+		Print(L"Reverting to %s.\n", default_boot_path);
 		Print(L"Press escape to cancel, any other key to boot.\n");
 		if (ReadKey().ScanCode == SCAN_ESC) {
 			goto fail;
@@ -381,26 +381,21 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		config.boot_path = default_boot_path;
 	}
 	if (config.debug) {
-		Print(L"HackBGRT: Ready to boot.\nPress escape to cancel, any other key to boot.\n");
+		Print(L"Windows is now ready to boot.\nPress escape to cancel, any other key to boot.\n");
 		if (ReadKey().ScanCode == SCAN_ESC) {
 			return 0;
 		}
 	}
 	if (EFI_ERROR(BS->StartImage(next_image_handle, 0, 0))) {
-		Print(L"HackBGRT: Failed to start %s.\n", config.boot_path);
+		Print(L"ERROR: Failed to start %s.\n", config.boot_path);
 		goto fail;
 	}
-	Print(L"HackBGRT: Started %s. Why are we still here?!\n", config.boot_path);
+	Print(L"Started %s.\n", config.boot_path);
 	goto fail;
 
 	fail: {
-		Print(L"HackBGRT has failed. Use parameter debug=1 for details.\n");
+		Print(L"The bootloader has failed. Use parameter debug=1 for details.\n");
 		Print(L"Get a Windows install disk or a recovery disk to fix your boot.\n");
-		#ifdef GIT_DESCRIBE
-			Print(L"HackBGRT version: " GIT_DESCRIBE L"\n");
-		#else
-			Print(L"HackBGRT version: unknown; not an official release?\n");
-		#endif
 		Print(L"Press any key to exit.\n");
 		ReadKey();
 		return 1;
