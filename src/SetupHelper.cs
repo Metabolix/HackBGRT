@@ -1,9 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Security.Principal;
-using System.Linq;
 
 /**
  * Helper functions.
@@ -65,41 +63,39 @@ public class SetupHelper {
 	}
 
 	/**
-	 * The Main program.
+	 * Check for required privileges (access to ESP and EFI vars).
 	 *
-	 * @param args The arguments.
+	 * @return True, if the file was successfully copied.
 	 */
-	public static void Main(string[] args) {
-		#if GIT_DESCRIBE
-			Console.WriteLine("HackBGRT installer version: {0}", GIT_DESCRIBE.data);
-		#else
-			Console.WriteLine("HackBGRT installer version: unknown; not an official release?");
-		#endif
-		var self = Assembly.GetExecutingAssembly().Location;
+	public static bool HasPrivileges() {
 		try {
-			// Relaunch as admin, if needed.
 			var id = WindowsIdentity.GetCurrent();
 			var principal = new WindowsPrincipal(id);
 			var admin = WindowsBuiltInRole.Administrator;
-			if (!principal.IsInRole(admin) && !args.Contains("no-elevate")) {
-				ProcessStartInfo startInfo = new ProcessStartInfo(self);
-				startInfo.Arguments = "no-elevate";
-				startInfo.Verb = "runas";
-				startInfo.UseShellExecute = true;
-				Process p = Process.Start(startInfo);
-				p.WaitForExit();
-				Environment.ExitCode = p.ExitCode;
-				return;
+			// FIXME: Check access to ESP as well.
+			if (!principal.IsInRole(admin)) {
+				return false;
 			}
 			Efi.EnablePrivilege();
+			return true;
 		} catch {
-			Console.WriteLine("This installer needs to be run as administrator!");
-			Console.WriteLine("Press any key to quit.");
-			Console.ReadKey();
-			Environment.ExitCode = 1;
-			return;
 		}
-		Directory.SetCurrentDirectory(Path.GetDirectoryName(self));
-		Setup.RunSetup();
+		return false;
+	}
+
+	/**
+	 * Run another process as admin, return the exit code.
+	 *
+	 * @param app Path to the application.
+	 * @param args The argument string.
+	 */
+	public static int RunElevated(string app, string args) {
+		ProcessStartInfo startInfo = new ProcessStartInfo(app);
+		startInfo.Arguments = args;
+		startInfo.Verb = "runas";
+		startInfo.UseShellExecute = true;
+		Process p = Process.Start(startInfo);
+		p.WaitForExit();
+		return p.ExitCode;
 	}
 }

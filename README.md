@@ -23,21 +23,30 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 	* If you wish to change the image or other configuration, just reinstall.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
 
+### Quiet (batch) installation
+
+* Edit the `config.txt` and `splash.bmp` (or any other images) to your needs.
+* Run `setup.exe batch COMMANDS` as administrator, with some of the following commands:
+	* `install` – copy the files but don't enable.
+	* `enable-overwrite` – overwrite the MS boot loader.
+	* `disable-overwrite` – restore the MS boot loader.
+	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
+	* `disable` – run all relevant `disable-*` commands.
+	* `uninstall` – disable and remove completely.
+* For example, run `setup.exe batch install allow-secure-boot enable-overwrite` to copy files and overwrite the MS boot loader regardless of Secure Boot status.
+
 ### Multi-boot configurations
 
 If you only need HackBGRT for Windows:
 
-* Extract the latest release to `[EFI System Partition]\EFI\HackBGRT\`.
-* Set `boot=\EFI\Microsoft\Boot\bootmgfw.efi` in `config.txt`.
-* Point your boot loader to `\EFI\HackBGRT\bootx64.efi`.
+* Run `setup.exe`, install files without enabling.
+* Configure your boot loader to start `\EFI\HackBGRT\loader.efi`.
 
 If you need it for other systems as well:
 
-* Extract the latest release to `[EFI System Partition]\EFI\HackBGRT\`.
-* Set `boot=\EFI\your-actual-boot-loader.efi` in `config.txt`.
-* Set `\EFI\HackBGRT\bootx64.efi` as your default boot loader with `efibootmgr` or some other EFI boot manager tool.
-
-On 32-bit machines, use `bootia32.efi` instead of `bootx64.efi`.
+* Configure HackBGRT to start your boot loader (such as systemd-boot): `boot=\EFI\systemd\systemd-bootx64.efi`.
+* Run `setup.exe`, install files.
+* Set `\EFI\HackBGRT\loader.efi` as your default boot loader with `efibootmgr` or some other EFI boot manager tool.
 
 ## Configuration
 

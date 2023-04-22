@@ -3,11 +3,22 @@ using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
+using System.Reflection;
+using System.Collections.Generic;
 
 /**
  * HackBGRT Setup.
  */
 public class Setup: SetupHelper {
+	/** @var Version of the setup program. */
+	const string Version =
+		#if GIT_DESCRIBE
+			GIT_DESCRIBE.data
+		#else
+			"unknown; not an official release?"
+		#endif
+	;
+
 	/**
 	 * The custom exception class for expected exceptions.
 	 */
@@ -26,6 +37,15 @@ public class Setup: SetupHelper {
 		}
 	}
 
+	/** @var The privileged actions. */
+	protected static readonly string[] privilegedActions = new string[] {
+		"install",
+		"allow-secure-boot",
+		"enable-overwrite", "disable-overwrite",
+		"disable",
+		"uninstall",
+	};
+
 	/** @var The target directory. */
 	protected string InstallPath;
 
@@ -36,11 +56,14 @@ public class Setup: SetupHelper {
 		}
 	}
 
+	/** @var Run in batch mode? */
+	protected bool Batch;
+
 	/**
 	 * Find or mount or manually choose the EFI System Partition.
 	 */
-	public static void InitEspPath() {
-		if (!Esp.Find() && !Esp.Mount()) {
+	protected void InitEspPath() {
+		if (Esp.Location == null && !Esp.Find() && !Esp.Mount() && !Batch) {
 			Console.WriteLine("EFI System Partition was not found.");
 			Console.WriteLine("Press enter to exit, or give ESP path here: ");
 			string s = Console.ReadLine();
@@ -165,7 +188,7 @@ public class Setup: SetupHelper {
 	/**
 	 * Install files to ESP.
 	 */
-	protected void Install() {
+	protected void InstallFiles() {
 		try {
 			if (!Directory.Exists(InstallPath)) {
 				Directory.CreateDirectory(InstallPath);
@@ -182,9 +205,6 @@ public class Setup: SetupHelper {
 			// Duplicate check, but better to be sure...
 			throw new SetupException("Failed to detect MS boot loader!");
 		}
-		if (!NewLoader.ReplaceWith(NewLoaderSource)) {
-			throw new SetupException("Couldn't copy new HackBGRT to ESP.");
-		}
 		InstallFile("config.txt");
 		foreach (var line in File.ReadAllLines("config.txt").Where(s => s.StartsWith("image="))) {
 			var delim = "path=\\EFI\\HackBGRT\\";
@@ -193,11 +213,32 @@ public class Setup: SetupHelper {
 				InstallImageFile(line.Substring(i + delim.Length));
 			}
 		}
+		InstallFile($"boot{EfiArch}.efi", "loader.efi");
+		Console.WriteLine($"HackBGRT has been copied to {InstallPath}.");
+	}
+
+	/**
+	 * Enable HackBGRT by overwriting the MS boot loader.
+	 */
+	protected void OverwriteMsLoader() {
+		var NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, "loader.efi"));
 		if (!MsLoader.ReplaceWith(NewLoader)) {
 			MsLoader.ReplaceWith(MsLoaderBackup);
 			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
 		}
-		Console.WriteLine("HackBGRT is now installed.");
+		Console.WriteLine($"Replaced {MsLoader.Path} with this app, stored backup in {MsLoaderBackup.Path}.");
+	}
+
+	/**
+	 * Restore the MS boot loader if it was previously replaced.
+	 */
+	protected void RestoreMsLoader() {
+		if (MsLoader.Type != BootLoaderType.MS) {
+			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
+				throw new SetupException("Couldn't restore the old MS loader.");
+			}
+			Console.WriteLine($"{MsLoader.Path} has been restored.");
+		}
 	}
 
 	/**
@@ -221,21 +262,10 @@ public class Setup: SetupHelper {
 	}
 
 	/**
-	 * Disable HackBGRT, restore the original boot loader.
-	 */
-	protected void Disable() {
-		if (MsLoader.Type != BootLoaderType.MS) {
-			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
-				throw new SetupException("Couldn't restore the old MS loader.");
-			}
-		}
-		Console.WriteLine(MsLoader.Path + " has been restored.");
-	}
-
-	/**
 	 * Uninstall HackBGRT completely.
 	 */
 	protected void Uninstall() {
+		RestoreMsLoader();
 		try {
 			Directory.Delete(InstallPath, true);
 			Console.WriteLine("HackBGRT has been removed.");
@@ -246,8 +276,10 @@ public class Setup: SetupHelper {
 
 	/**
 	 * Check Secure Boot status and inform the user.
+	 *
+	 * @param allowSecureBoot Allow Secure Boot to be enabled?
 	 */
-	public static void HandleSecureBoot() {
+	protected void HandleSecureBoot(bool allowSecureBoot) {
 		int secureBoot = Efi.GetSecureBootStatus();
 		if (secureBoot == 0) {
 			Console.WriteLine("Secure Boot is disabled, good!");
@@ -259,6 +291,12 @@ public class Setup: SetupHelper {
 			}
 			Console.WriteLine("It's very important to disable Secure Boot before installing.");
 			Console.WriteLine("Otherwise your machine may become unbootable.");
+			if (Batch) {
+				if (allowSecureBoot) {
+					return;
+				}
+				throw new SetupException("Aborting because of Secure Boot.");
+			}
 			Console.WriteLine("Choose action (press a key):");
 			bool canBootToFW = Efi.CanBootToFW();
 			if (canBootToFW) {
@@ -281,22 +319,20 @@ public class Setup: SetupHelper {
 				if (k2 == ConsoleKey.R) {
 					StartProcess("shutdown", "-f -r -t 1");
 				}
-				Environment.Exit(0);
 				throw new ExitSetup(0);
 			} else {
-				Console.WriteLine("Aborting because of Secure Boot.");
-				throw new ExitSetup(1);
+				throw new SetupException("Aborting because of Secure Boot.");
 			}
 		}
 	}
 
-	protected BootLoaderInfo MsLoader, MsLoaderBackup, NewLoader, NewLoaderSource;
+	protected BootLoaderInfo MsLoader, MsLoaderBackup;
 	protected string EfiArch;
 
 	/**
 	 * Initialize information for the Setup.
 	 */
-	protected Setup() {
+	protected void InitEspInfo() {
 		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
 		MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
 		MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
@@ -307,18 +343,13 @@ public class Setup: SetupHelper {
 		} else {
 			throw new SetupException("Failed to detect MS boot loader!");
 		}
-		string loaderName = "boot" + EfiArch + ".efi";
-		NewLoaderSource = new BootLoaderInfo(loaderName);
-		NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, loaderName));
-		if (!NewLoaderSource.Exists) {
-			throw new SetupException("Couldn't find required files! Missing: " + NewLoaderSource.Path);
-		}
 	}
 
 	/**
 	 * Ask for user's choice and install/uninstall.
 	 */
-	protected void HandleUserAction() {
+	protected void ShowMenu() {
+		var NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, "loader.efi"));
 		bool isEnabled = MsLoader.Type == BootLoaderType.Own;
 		bool isInstalled = NewLoader.Type == BootLoaderType.Own;
 
@@ -334,6 +365,7 @@ public class Setup: SetupHelper {
 		Console.WriteLine();
 		Console.WriteLine("Choose action (press a key):");
 		Console.WriteLine(" I = install, upgrade, repair, modify...");
+		Console.WriteLine(" F = install files only, don't enable");
 		if (isEnabled) {
 			Console.WriteLine(" D = disable, restore the original boot loader");
 		}
@@ -344,16 +376,17 @@ public class Setup: SetupHelper {
 
 		var k = Console.ReadKey().Key;
 		Console.WriteLine();
-		if (k == ConsoleKey.I) {
+		if (k == ConsoleKey.I || k == ConsoleKey.F) {
 			Configure();
-			Install();
-		} else if ((isEnabled && k == ConsoleKey.D) || (isInstalled && k == ConsoleKey.R)) {
-			if (isEnabled) {
-				Disable();
-			}
-			if (k == ConsoleKey.R) {
-				Uninstall(); // NOTICE: It's imperative to Disable() first!
-			}
+		}
+		if (k == ConsoleKey.I) {
+			RunPrivilegedActions(new string[] { "install", "enable-overwrite" });
+		} else if (k == ConsoleKey.F) {
+			RunPrivilegedActions(new string[] { "install" });
+		} else if (k == ConsoleKey.D) {
+			RunPrivilegedActions(new string[] { "disable" });
+		} else if (k == ConsoleKey.R) {
+			RunPrivilegedActions(new string[] { "uninstall" });
 		} else if (k == ConsoleKey.C) {
 			throw new ExitSetup(1);
 		} else {
@@ -362,25 +395,88 @@ public class Setup: SetupHelper {
 	}
 
 	/**
-	 * Run the setup.
+	 * Run privileged actions.
+	 *
+	 * @param actions The actions to run.
 	 */
-	public static void RunSetup() {
+	protected void RunPrivilegedActions(IEnumerable<string> actions) {
+		bool allowSecureBoot = false;
+		foreach (var arg in actions) {
+			Log($"Running action '{arg}'.");
+			if (arg == "install") {
+				InstallFiles();
+			} else if (arg == "allow-secure-boot") {
+				allowSecureBoot = true;
+			} else if (arg == "enable-overwrite") {
+				HandleSecureBoot(allowSecureBoot);
+				OverwriteMsLoader();
+			} else if (arg == "disable-overwrite") {
+				RestoreMsLoader();
+			} else if (arg == "disable") {
+				RestoreMsLoader();
+			} else if (arg == "uninstall") {
+				Uninstall();
+			} else {
+				throw new SetupException($"Invalid action: '{arg}'!");
+			}
+			Console.WriteLine($"Completed action '{arg}' successfully.");
+		}
+	}
+
+	/**
+	 * The Main program.
+	 *
+	 * @param args The arguments.
+	 */
+	public static void Main(string[] args) {
+		Console.WriteLine($"HackBGRT installer version: {Version}");
+		var self = Assembly.GetExecutingAssembly().Location;
+		Directory.SetCurrentDirectory(Path.GetDirectoryName(self));
+		Environment.ExitCode = new Setup().Run(args);
+	}
+
+	/**
+	 * Run the setup.
+	 *
+	 * @param args The arguments.
+	 */
+	protected int Run(string[] args) {
+		Batch = args.Contains("batch");
 		try {
+			if (args.Contains("is-elevated") && !HasPrivileges()) {
+				Console.WriteLine("This installer needs to be run as administrator!");
+				return 1;
+			}
+			if (!HasPrivileges()) {
+				var self = Assembly.GetExecutingAssembly().Location;
+				return RunElevated(self, String.Join(" ", args.Prepend("is-elevated")));
+			}
 			InitEspPath();
-			HandleSecureBoot();
-			var s = new Setup();
-			s.HandleUserAction();
+			InitEspInfo();
+			var actions = args.Where(s => privilegedActions.Contains(s));
+			if (actions.Count() > 0) {
+				RunPrivilegedActions(actions);
+				return 0;
+			}
+			if (Batch) {
+				throw new SetupException("No action specified!");
+			}
+			ShowMenu();
+			return 0;
 		} catch (ExitSetup e) {
-			Environment.ExitCode = e.Code;
+			return e.Code;
 		} catch (SetupException e) {
 			Console.WriteLine("Error: {0}", e.Message);
-			Environment.ExitCode = 1;
+			return 1;
 		} catch (Exception e) {
 			Console.WriteLine("Unexpected error!\n{0}", e.ToString());
 			Console.WriteLine("If this is the most current release, please report this bug.");
-			Environment.ExitCode = 1;
+			return 1;
+		} finally {
+			if (!Batch) {
+				Console.WriteLine("Press any key to quit.");
+				Console.ReadKey();
+			}
 		}
-		Console.WriteLine("Press any key to quit.");
-		Console.ReadKey();
 	}
 }
