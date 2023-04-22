@@ -391,6 +391,25 @@ public class Setup: SetupHelper {
 	 * @param actions The actions to run.
 	 */
 	protected void RunPrivilegedActions(IEnumerable<string> actions) {
+		if (!HasPrivileges() && !DryRun) {
+			var batchStr = Batch ? "batch" : "";
+			var self = Assembly.GetExecutingAssembly().Location;
+			var arg = String.Join(" ", actions);
+			var result = 0;
+			try {
+				result = RunElevated(self, $"is-elevated {batchStr} {arg}");
+			} catch (Exception e) {
+				throw new SetupException($"Privileged action ({arg}) failed: {e.Message}");
+			}
+			if (result != 0) {
+				throw new SetupException($"Privileged action ({arg}) failed!");
+			}
+			Console.WriteLine($"Privileged action ({arg}) completed.");
+			return;
+		}
+
+		InitEspPath();
+		InitEspInfo();
 		bool allowSecureBoot = false;
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
@@ -439,12 +458,6 @@ public class Setup: SetupHelper {
 				Console.WriteLine("This installer needs to be run as administrator!");
 				return 1;
 			}
-			if (!HasPrivileges() && !DryRun) {
-				var self = Assembly.GetExecutingAssembly().Location;
-				return RunElevated(self, String.Join(" ", args.Prepend("is-elevated")));
-			}
-			InitEspPath();
-			InitEspInfo();
 			var actions = args.Where(s => privilegedActions.Contains(s));
 			if (actions.Count() > 0) {
 				RunPrivilegedActions(actions);
