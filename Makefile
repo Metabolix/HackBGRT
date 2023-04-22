@@ -28,7 +28,7 @@ $(ZIP): bootx64.efi bootia32.efi config.txt splash.bmp setup.exe README.md CHANG
 	rm -rf "$(ZIPDIR)"
 
 src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
-	echo 'public class GIT_DESCRIBE { public static string data = "$(GIT_DESCRIBE)"; }' > $@
+	echo 'public class GIT_DESCRIBE { public const string data = "$(GIT_DESCRIBE)"; }' > $@
 
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
 	csc /define:GIT_DESCRIBE /out:$@ $^
