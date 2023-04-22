@@ -15,9 +15,9 @@ CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
 ZIP = $(ZIPDIR).zip
 
+all: efi setup zip
 efi: bootx64.efi bootia32.efi
 setup: setup.exe
-all: efi setup
 
 zip: $(ZIP)
 $(ZIP): bootx64.efi bootia32.efi config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE
