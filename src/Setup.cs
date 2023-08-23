@@ -120,7 +120,7 @@ public class Setup: SetupHelper {
 				byte[] data = File.ReadAllBytes(Path);
 				Exists = true;
 				string tmp = System.Text.Encoding.ASCII.GetString(data);
-				if (tmp.IndexOf("HackBGRT") >= 0) {
+				if (tmp.IndexOf("HackBGRT") >= 0 || tmp.IndexOf("HackBgrt") >= 0) {
 					Type = BootLoaderType.Own;
 				} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
 					Type = BootLoaderType.MS;
@@ -240,7 +240,7 @@ public class Setup: SetupHelper {
 	 */
 	protected void RestoreMsLoader() {
 		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
-		if (MsLoader.Type != BootLoaderType.MS) {
+		if (MsLoader.Type == BootLoaderType.Own) {
 			var MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
 			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
 				throw new SetupException("Couldn't restore the old MS loader.");
