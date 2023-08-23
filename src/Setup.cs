@@ -59,6 +59,9 @@ public class Setup: SetupHelper {
 	/** @var The EFI architecture identifier. */
 	protected string EfiArch;
 
+	/** @var Dry run? */
+	protected bool DryRun;
+
 	/** @var Run in batch mode? */
 	protected bool Batch;
 
@@ -66,6 +69,10 @@ public class Setup: SetupHelper {
 	 * Find or mount or manually choose the EFI System Partition.
 	 */
 	protected void InitEspPath() {
+		if (DryRun) {
+			Directory.CreateDirectory(Path.Combine("dry-run", "EFI"));
+			Esp.TryPath("dry-run", false);
+		}
 		if (Esp.Location == null && !Esp.Find() && !Esp.Mount() && !Batch) {
 			Console.WriteLine("EFI System Partition was not found.");
 			Console.WriteLine("Press enter to exit, or give ESP path here: ");
@@ -276,7 +283,7 @@ public class Setup: SetupHelper {
 		RestoreMsLoader();
 		try {
 			Directory.Delete(InstallPath, true);
-			Console.WriteLine("HackBGRT has been removed.");
+			Console.WriteLine($"HackBGRT has been removed from {InstallPath}.");
 		} catch {
 			throw new SetupException($"The directory {InstallPath} couldn't be removed.");
 		}
@@ -425,13 +432,14 @@ public class Setup: SetupHelper {
 	 * @param args The arguments.
 	 */
 	protected int Run(string[] args) {
+		DryRun = args.Contains("dry-run");
 		Batch = args.Contains("batch");
 		try {
-			if (args.Contains("is-elevated") && !HasPrivileges()) {
+			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				Console.WriteLine("This installer needs to be run as administrator!");
 				return 1;
 			}
-			if (!HasPrivileges()) {
+			if (!HasPrivileges() && !DryRun) {
 				var self = Assembly.GetExecutingAssembly().Location;
 				return RunElevated(self, String.Join(" ", args.Prepend("is-elevated")));
 			}
@@ -457,6 +465,9 @@ public class Setup: SetupHelper {
 			Console.WriteLine("If this is the most current release, please report this bug.");
 			return 1;
 		} finally {
+			if (DryRun) {
+				Console.WriteLine("This was a dry run, your system was not actually modified.");
+			}
 			if (!Batch) {
 				Console.WriteLine("Press any key to quit.");
 				Console.ReadKey();

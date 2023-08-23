@@ -48,6 +48,8 @@ If you need it for other systems as well:
 * Run `setup.exe`, install files.
 * Set `\EFI\HackBGRT\loader.efi` as your default boot loader with `efibootmgr` or some other EFI boot manager tool.
 
+To install purely on Linux, you can install with `setup.exe dry-run` and then manually copy files from `dry-run/EFI` to your `[EFI System Partition]/EFI`. For further instructions, consult the documentation of your own Linux system.
+
 ## Configuration
 
 The configuration options are described in `config.txt`, which the installer copies into `[EFI System Partition]\EFI\HackBGRT\config.txt`.
