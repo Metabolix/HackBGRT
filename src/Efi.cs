@@ -135,10 +135,22 @@ public class Efi {
 
 	public const string EFI_GLOBAL_GUID = "{8be4df61-93ca-11d2-aa0d-00e098032b8c}";
 
+	public const string LinuxEfiDir = "/sys/firmware/efi/efivars";
+
 	/**
 	 * Enable the privilege to access EFI variables.
 	 */
 	public static void EnablePrivilege() {
+		if (Directory.Exists(LinuxEfiDir)) {
+			var linuxEfiFile = $"{LinuxEfiDir}/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c";
+			if (File.Exists(linuxEfiFile)) {
+				using (FileStream fs = File.OpenWrite(linuxEfiFile)) {
+					// OpenWrite throws an exception on error.
+				}
+			}
+			return;
+		}
+
 		const int SE_PRIVILEGE_ENABLED = 0x00000002;
 		const int TOKEN_QUERY = 0x00000008;
 		const int TOKEN_ADJUST_PRIVILEGES = 0x00000020;
@@ -176,6 +188,17 @@ public class Efi {
 		result.Guid = guid;
 		result.Data = null;
 		result.Attributes = 0;
+
+		if (Directory.Exists(LinuxEfiDir)) {
+			var linuxEfiFile = $"{LinuxEfiDir}/{name}-{guid.Substring(1, guid.Length - 2)}";
+			if (File.Exists(linuxEfiFile)) {
+				var d = File.ReadAllBytes(linuxEfiFile);
+				result.Attributes = (UInt32)(d[0] + 0x100 * d[1] + 0x10000 * d[2] + 0x1000000 * d[3]);
+				result.Data = d.Skip(4).ToArray();
+			}
+			return result;
+		}
+
 		for (UInt32 i = 4096; i <= 1024*1024; i *= 2) {
 			byte[] buf = new byte[i];
 			UInt32 len = GetFirmwareEnvironmentVariableEx(name, guid, buf, (UInt32) buf.Length, out result.Attributes);
@@ -211,6 +234,15 @@ public class Efi {
 	private static void SetVariable(Variable v, bool dryRun = false) {
 		Console.WriteLine($"Writing EFI variable {v}");
 		if (dryRun) {
+			return;
+		}
+
+		if (Directory.Exists(LinuxEfiDir)) {
+			var linuxEfiFile = $"{LinuxEfiDir}/{v.Name}-{v.Guid.Substring(1, v.Guid.Length - 2)}";
+			var a = v.Attributes;
+			var b = new byte[] { (byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) (a >> 24) };
+			// FIXME: Just writing won't work: File.WriteAllBytes(linuxEfiFile, b.Concat(v.Data).ToArray());
+			Console.WriteLine("FIXME: Can't yet write EFI variables in Linux.");
 			return;
 		}
 
