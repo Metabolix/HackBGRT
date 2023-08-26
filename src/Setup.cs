@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 
 /**
  * HackBGRT Setup.
@@ -123,7 +124,18 @@ public class Setup: SetupHelper {
 	}
 
 	/**
-	 * Install files and replace the MsLoader with our own.
+	 * Install a single file.
+	 */
+	protected void InstallFile(string name, string newName = null) {
+		newName = Path.Combine(InstallPath, newName == null ? name : newName);
+		if (!Copy(name, newName)) {
+			throw new SetupException($"Failed to install file {name} to {newName}.");
+		}
+		Console.WriteLine($"Installed {name} to {newName}.");
+	}
+
+	/**
+	 * Install files to ESP.
 	 */
 	protected void Install() {
 		try {
@@ -145,13 +157,14 @@ public class Setup: SetupHelper {
 		if (!NewLoader.ReplaceWith(NewLoaderSource)) {
 			throw new SetupException("Couldn't copy new HackBGRT to ESP.");
 		}
-		if (!File.Exists(Config)) {
-			Copy("config.txt", Config);
+		InstallFile("config.txt");
+		foreach (var line in File.ReadAllLines("config.txt").Where(s => s.StartsWith("image="))) {
+			var delim = "path=\\EFI\\HackBGRT\\";
+			var i = line.IndexOf(delim);
+			if (i > 0) {
+				InstallFile(line.Substring(i + delim.Length));
+			}
 		}
-		if (!File.Exists(Splash)) {
-			Copy("splash.bmp", Splash);
-		}
-		Configure();
 		if (!MsLoader.ReplaceWith(NewLoader)) {
 			MsLoader.ReplaceWith(MsLoaderBackup);
 			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
@@ -163,23 +176,18 @@ public class Setup: SetupHelper {
 	 * Configure HackBGRT.
 	 */
 	protected void Configure() {
-		// Open config.txt in notepad.
-		Console.WriteLine("Check the configuration in " + Config + ".");
-		Console.WriteLine(" - Use the supplied config.txt as reference.");
-		Console.WriteLine(" - Be sure to check for any format changes if updating!");
-		try {
-			StartProcess("notepad", Config).WaitForExit();
-		} catch {
-			Console.WriteLine("Editing config.txt with notepad failed!");
-		}
-		Console.WriteLine();
+		Console.WriteLine("This setup program lets you edit just one image.");
+		Console.WriteLine("Edit config.txt manually for advanced configuration.");
 
 		// Open splash.bmp in mspaint.
-		Console.WriteLine("Draw or copy your preferred image to " + Splash + ".");
+		Console.WriteLine("Draw or copy your preferred image to splash.bmp.");
 		try {
-			StartProcess("mspaint", Splash).WaitForExit();
+			StartProcess("mspaint", "splash.bmp").WaitForExit();
 		} catch {
 			Console.WriteLine("Editing splash.bmp with mspaint failed!");
+			Console.WriteLine("Edit splash.bmp with your preferred editor.");
+			Console.WriteLine("Press any key to continue.");
+			Console.ReadKey();
 		}
 		Console.WriteLine();
 	}
@@ -254,7 +262,6 @@ public class Setup: SetupHelper {
 		}
 	}
 
-	protected string Config, Splash;
 	protected BootLoaderInfo MsLoader, MsLoaderBackup, NewLoader, NewLoaderSource;
 	protected string EfiArch;
 
@@ -263,8 +270,6 @@ public class Setup: SetupHelper {
 	 */
 	protected Setup() {
 		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
-		Config = Path.Combine(InstallPath, "config.txt");
-		Splash = Path.Combine(InstallPath, "splash.bmp");
 		MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
 		MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
 		if (MsLoader.Type == BootLoaderType.MS) {
@@ -312,6 +317,7 @@ public class Setup: SetupHelper {
 		var k = Console.ReadKey().Key;
 		Console.WriteLine();
 		if (k == ConsoleKey.I) {
+			Configure();
 			Install();
 		} else if ((isEnabled && k == ConsoleKey.D) || (isInstalled && k == ConsoleKey.R)) {
 			if (isEnabled) {

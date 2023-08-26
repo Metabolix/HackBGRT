@@ -18,14 +18,11 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 * Get the latest release from the Releases page.
 * Start `setup.exe` and follow the instructions.
 	* You may need to manually disable Secure Boot and then retry.
-	* The installer will launch Notepad for modifying the configuration.
-		* If you need only one custom image, the defaults are fine.
-		* Otherwise, check out the examples in the configuration file.
-	* The installer will launch Paint for creating the image(s).
-		* You can create multiple images by using Save As.
+	* The installer will launch Paint for editing the image.
 		* Be sure to always use the 24-bit BMP/DIB format.
 	* If Windows later restores the original boot loader, just reinstall.
 	* If you wish to change the image or other configuration, just reinstall.
+	* For advanced settings, edit `config.txt` before installing. No extra support provided!
 
 ### Multi-boot configurations
 
@@ -45,7 +42,7 @@ On 32-bit machines, use `bootia32.efi` instead of `bootx64.efi`.
 
 ## Configuration
 
-The configuration options are described in `config.txt`, which should be stored in `[EFI System Partition]\EFI\HackBGRT\config.txt`.
+The configuration options are described in `config.txt`, which the installer copies into `[EFI System Partition]\EFI\HackBGRT\config.txt`.
 
 ## Images
 
@@ -53,7 +50,7 @@ The image path can be changed in the configuration file. The default path is `[E
 
 The image must be a 24-bit BMP file with a 54-byte header. That's a TrueColor BMP3 in Imagemagick, or 24-bit BMP/DIB in Microsoft Paint.
 
-Multiple images may be specified, in which case one is picked at random.
+Advanced users may edit the `config.txt` to define multiple images, in which case one is picked at random. The installer copies files whose `path` starts with `\EFI\HackBGRT\`.
 
 ## Recovery
 
