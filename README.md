@@ -19,7 +19,6 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 * Start `setup.exe` and follow the instructions.
 	* You may need to manually disable Secure Boot and then retry.
 	* The installer will launch Paint for editing the image.
-		* Be sure to always use the 24-bit BMP/DIB format.
 	* If Windows later restores the original boot loader, just reinstall.
 	* If you wish to change the image or other configuration, just reinstall.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
@@ -48,9 +47,9 @@ The configuration options are described in `config.txt`, which the installer cop
 
 The image path can be changed in the configuration file. The default path is `[EFI System Partition]\EFI\HackBGRT\splash.bmp`.
 
-The image must be a 24-bit BMP file with a 54-byte header. That's a TrueColor BMP3 in Imagemagick, or 24-bit BMP/DIB in Microsoft Paint.
+If you copy the file to ESP manually, note that the image must be a 24-bit BMP file with a 54-byte header. That's a TrueColor BMP3 in Imagemagick, or 24-bit BMP/DIB in Microsoft Paint.
 
-Advanced users may edit the `config.txt` to define multiple images, in which case one is picked at random. The installer copies files whose `path` starts with `\EFI\HackBGRT\`.
+Advanced users may edit the `config.txt` to define multiple images, in which case one is picked at random. The installer copies and converts files whose `path` starts with `\EFI\HackBGRT\`.
 
 ## Recovery
 

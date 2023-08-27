@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
 
 /**
@@ -135,6 +137,32 @@ public class Setup: SetupHelper {
 	}
 
 	/**
+	 * Install a single image file, with conversion to 24-bit BMP.
+	 */
+	protected void InstallImageFile(string name) {
+		var newName = Path.Combine(InstallPath, name);
+		// Load the image to check if it's valid.
+		Bitmap img;
+		try {
+			img = new Bitmap(name);
+		} catch {
+			throw new SetupException($"Failed to load image {name}.");
+		}
+		// Copy the bitmap into an empty 24-bit image (required by EFI).
+		using (Bitmap bmp = new Bitmap(img.Width, img.Height, PixelFormat.Format24bppRgb)) {
+			using (Graphics g = Graphics.FromImage(bmp)) {
+				g.DrawImageUnscaledAndClipped(img, new Rectangle(Point.Empty, img.Size));
+			}
+			try {
+				bmp.Save(newName, ImageFormat.Bmp);
+			} catch {
+				throw new SetupException($"Failed to install image {name} to {newName}.");
+			}
+		}
+		Console.WriteLine($"Installed image {name} to {newName}.");
+	}
+
+	/**
 	 * Install files to ESP.
 	 */
 	protected void Install() {
@@ -162,7 +190,7 @@ public class Setup: SetupHelper {
 			var delim = "path=\\EFI\\HackBGRT\\";
 			var i = line.IndexOf(delim);
 			if (i > 0) {
-				InstallFile(line.Substring(i + delim.Length));
+				InstallImageFile(line.Substring(i + delim.Length));
 			}
 		}
 		if (!MsLoader.ReplaceWith(NewLoader)) {
