@@ -56,6 +56,9 @@ public class Setup: SetupHelper {
 		}
 	}
 
+	/** @var The EFI architecture identifier. */
+	protected string EfiArch;
+
 	/** @var Run in batch mode? */
 	protected bool Batch;
 
@@ -196,15 +199,7 @@ public class Setup: SetupHelper {
 		} catch {
 			throw new SetupException("Failed to copy files to ESP!");
 		}
-		if (MsLoader.Type == BootLoaderType.MS) {
-			if (!MsLoaderBackup.ReplaceWith(MsLoader)) {
-				throw new SetupException("Failed to backup MS boot loader!");
-			}
-		}
-		if (MsLoaderBackup.Type != BootLoaderType.MS) {
-			// Duplicate check, but better to be sure...
-			throw new SetupException("Failed to detect MS boot loader!");
-		}
+
 		InstallFile("config.txt");
 		foreach (var line in File.ReadAllLines("config.txt").Where(s => s.StartsWith("image="))) {
 			var delim = "path=\\EFI\\HackBGRT\\";
@@ -221,7 +216,18 @@ public class Setup: SetupHelper {
 	 * Enable HackBGRT by overwriting the MS boot loader.
 	 */
 	protected void OverwriteMsLoader() {
+		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
 		var NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, "loader.efi"));
+		var MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
+		if (MsLoader.Type == BootLoaderType.MS) {
+			if (!MsLoaderBackup.ReplaceWith(MsLoader)) {
+				throw new SetupException("Failed to backup MS boot loader!");
+			}
+		}
+		if (MsLoaderBackup.Type != BootLoaderType.MS) {
+			// Duplicate check, but better to be sure...
+			throw new SetupException("Failed to detect MS boot loader!");
+		}
 		if (!MsLoader.ReplaceWith(NewLoader)) {
 			MsLoader.ReplaceWith(MsLoaderBackup);
 			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
@@ -233,7 +239,9 @@ public class Setup: SetupHelper {
 	 * Restore the MS boot loader if it was previously replaced.
 	 */
 	protected void RestoreMsLoader() {
+		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
 		if (MsLoader.Type != BootLoaderType.MS) {
+			var MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
 			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
 				throw new SetupException("Couldn't restore the old MS loader.");
 			}
@@ -326,22 +334,15 @@ public class Setup: SetupHelper {
 		}
 	}
 
-	protected BootLoaderInfo MsLoader, MsLoaderBackup;
-	protected string EfiArch;
-
 	/**
 	 * Initialize information for the Setup.
 	 */
 	protected void InitEspInfo() {
 		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
-		MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
-		MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
-		if (MsLoader.Type == BootLoaderType.MS) {
+		EfiArch = IntPtr.Size == 4 ? "ia32" : "x64";
+		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
+		if (MsLoader.Arch != null) {
 			EfiArch = MsLoader.Arch;
-		} else if (MsLoaderBackup.Type == BootLoaderType.MS) {
-			EfiArch = MsLoaderBackup.Arch;
-		} else {
-			throw new SetupException("Failed to detect MS boot loader!");
 		}
 	}
 
@@ -349,29 +350,12 @@ public class Setup: SetupHelper {
 	 * Ask for user's choice and install/uninstall.
 	 */
 	protected void ShowMenu() {
-		var NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, "loader.efi"));
-		bool isEnabled = MsLoader.Type == BootLoaderType.Own;
-		bool isInstalled = NewLoader.Type == BootLoaderType.Own;
-
-		if (isEnabled) {
-			Console.WriteLine("HackBGRT is currently enabled.");
-		} else {
-			if (isInstalled) {
-				Console.WriteLine("HackBGRT is currently disabled.");
-			} else {
-				Console.WriteLine("HackBGRT is currently not installed.");
-			}
-		}
 		Console.WriteLine();
 		Console.WriteLine("Choose action (press a key):");
-		Console.WriteLine(" I = install, upgrade, repair, modify...");
+		Console.WriteLine(" I = install, enable, upgrade, repair, modify");
 		Console.WriteLine(" F = install files only, don't enable");
-		if (isEnabled) {
-			Console.WriteLine(" D = disable, restore the original boot loader");
-		}
-		if (isInstalled) {
-			Console.WriteLine(" R = remove completely; delete all HackBGRT files and images");
-		}
+		Console.WriteLine(" D = disable, restore the original boot loader");
+		Console.WriteLine(" R = remove completely; delete all HackBGRT files and images");
 		Console.WriteLine(" C = cancel");
 
 		var k = Console.ReadKey().Key;
