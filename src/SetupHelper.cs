@@ -99,6 +99,7 @@ public class SetupHelper {
 			Environment.ExitCode = 1;
 			return;
 		}
-		Setup.RunSetup(Path.GetDirectoryName(self));
+		Directory.SetCurrentDirectory(Path.GetDirectoryName(self));
+		Setup.RunSetup();
 	}
 }

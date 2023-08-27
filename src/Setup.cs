@@ -23,6 +23,16 @@ public class Setup: SetupHelper {
 		}
 	}
 
+	/** @var The target directory. */
+	protected string InstallPath;
+
+	/** @var The backup MS boot loader path. */
+	protected string BackupLoaderPath {
+		get {
+			return Path.Combine(InstallPath, "bootmgfw-original.efi");
+		}
+	}
+
 	/**
 	 * Find or mount or manually choose the EFI System Partition.
 	 */
@@ -38,10 +48,10 @@ public class Setup: SetupHelper {
 				Console.WriteLine("That's not a valid ESP path!");
 			}
 		}
-		if (Esp.Path == null) {
+		if (Esp.Location == null) {
 			throw new SetupException("EFI System Partition was not found.");
 		}
-		Console.WriteLine("EFI System Partition location is " + Esp.Path);
+		Console.WriteLine("EFI System Partition location is " + Esp.Location);
 	}
 
 	/**
@@ -117,8 +127,8 @@ public class Setup: SetupHelper {
 	 */
 	protected void Install() {
 		try {
-			if (!Directory.Exists(Destination)) {
-				Directory.CreateDirectory(Destination);
+			if (!Directory.Exists(InstallPath)) {
+				Directory.CreateDirectory(InstallPath);
 			}
 		} catch {
 			throw new SetupException("Failed to copy files to ESP!");
@@ -136,10 +146,10 @@ public class Setup: SetupHelper {
 			throw new SetupException("Couldn't copy new HackBGRT to ESP.");
 		}
 		if (!File.Exists(Config)) {
-			Copy(Source + "\\config.txt", Config);
+			Copy("config.txt", Config);
 		}
 		if (!File.Exists(Splash)) {
-			Copy(Source + "\\splash.bmp", Splash);
+			Copy("splash.bmp", Splash);
 		}
 		Configure();
 		if (!MsLoader.ReplaceWith(NewLoader)) {
@@ -191,10 +201,10 @@ public class Setup: SetupHelper {
 	 */
 	protected void Uninstall() {
 		try {
-			Directory.Delete(Destination, true);
+			Directory.Delete(InstallPath, true);
 			Console.WriteLine("HackBGRT has been removed.");
 		} catch {
-			throw new SetupException("The directory " + Destination + " couldn't be removed.");
+			throw new SetupException($"The directory {InstallPath} couldn't be removed.");
 		}
 	}
 
@@ -244,20 +254,19 @@ public class Setup: SetupHelper {
 		}
 	}
 
-	protected string Source, Destination, Config, Splash;
+	protected string Config, Splash;
 	protected BootLoaderInfo MsLoader, MsLoaderBackup, NewLoader, NewLoaderSource;
 	protected string EfiArch;
 
 	/**
 	 * Initialize information for the Setup.
 	 */
-	protected Setup(string source, string esp) {
-		Source = source;
-		Destination = esp + "\\EFI\\HackBGRT";
-		Config = Destination + "\\config.txt";
-		Splash = Destination + "\\splash.bmp";
-		MsLoaderBackup = new BootLoaderInfo(Destination + "\\bootmgfw-original.efi");
-		MsLoader = new BootLoaderInfo(esp + "\\EFI\\Microsoft\\Boot\\bootmgfw.efi");
+	protected Setup() {
+		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
+		Config = Path.Combine(InstallPath, "config.txt");
+		Splash = Path.Combine(InstallPath, "splash.bmp");
+		MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
+		MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
 		if (MsLoader.Type == BootLoaderType.MS) {
 			EfiArch = MsLoader.Arch;
 		} else if (MsLoaderBackup.Type == BootLoaderType.MS) {
@@ -266,8 +275,8 @@ public class Setup: SetupHelper {
 			throw new SetupException("Failed to detect MS boot loader!");
 		}
 		string loaderName = "boot" + EfiArch + ".efi";
-		NewLoaderSource = new BootLoaderInfo(Source + "\\" + loaderName);
-		NewLoader = new BootLoaderInfo(Destination + "\\" + loaderName);
+		NewLoaderSource = new BootLoaderInfo(loaderName);
+		NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, loaderName));
 		if (!NewLoaderSource.Exists) {
 			throw new SetupException("Couldn't find required files! Missing: " + NewLoaderSource.Path);
 		}
@@ -320,14 +329,12 @@ public class Setup: SetupHelper {
 
 	/**
 	 * Run the setup.
-	 *
-	 * @param source Path to the installation files.
 	 */
-	public static void RunSetup(string source) {
+	public static void RunSetup() {
 		try {
 			InitEspPath();
 			HandleSecureBoot();
-			var s = new Setup(source, Esp.Path);
+			var s = new Setup();
 			s.HandleUserAction();
 		} catch (ExitSetup e) {
 			Environment.ExitCode = e.Code;
