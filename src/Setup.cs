@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 /**
  * HackBGRT Setup.
@@ -59,6 +60,12 @@ public class Setup: SetupHelper {
 
 	/** @var The EFI architecture identifier. */
 	protected string EfiArch;
+
+	/** @var User-defined EFI architecture? */
+	protected bool UserDefinedArch = false;
+
+	/** @var Arguments to forward to the elevated process. */
+	protected string ForwardArguments;
 
 	/** @var Dry run? */
 	protected bool DryRun;
@@ -133,11 +140,14 @@ public class Setup: SetupHelper {
 				} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
 					Type = BootLoaderType.MS;
 				}
-				switch (BitConverter.ToUInt16(data, BitConverter.ToInt32(data, 0x3c) + 4)) {
-					case 0x014c: Arch = "ia32"; break;
-					case 0x0200: Arch = "ia64"; break;
-					case 0x8664: Arch = "x64"; break;
-				}
+				var peArch = BitConverter.ToUInt16(data, BitConverter.ToInt32(data, 0x3c) + 4);
+				Arch = peArch switch {
+					0x014c => "ia32",
+					0x0200 => "ia64",
+					0x8664 => "x64",
+					0xaa64 => "aa64",
+					_ => $"unknown-{peArch:x4}"
+				};
 			} catch {
 			}
 		}
@@ -200,6 +210,9 @@ public class Setup: SetupHelper {
 	 * Install files to ESP.
 	 */
 	protected void InstallFiles() {
+		if (!File.Exists($"boot{EfiArch}.efi")) {
+			throw new SetupException($"Missing boot{EfiArch}.efi, {EfiArch} is not supported!");
+		}
 		try {
 			if (!Directory.Exists(InstallPath)) {
 				Directory.CreateDirectory(InstallPath);
@@ -361,14 +374,52 @@ public class Setup: SetupHelper {
 	}
 
 	/**
+	 * Detect the EFI architecture.
+	 */
+	protected static string DetectArchFromOS() {
+		var arch = RuntimeInformation.OSArchitecture;
+		return arch switch {
+			Architecture.X86 => "ia32",
+			Architecture.X64 => "x64",
+			Architecture.Arm => "arm",
+			Architecture.Arm64 => "aa64",
+			_ => $"-unsupported-{arch}"
+		};
+	}
+
+	/**
+	 * Set the EFI architecture.
+	 *
+	 * @param arch The architecture.
+	 */
+	protected void SetArch(string arch) {
+		var detectedArch = DetectArchFromOS();
+		if (arch == "") {
+			EfiArch = detectedArch;
+			Console.WriteLine($"Your OS uses arch={EfiArch}. This will be checked again during installation.");
+		} else {
+			EfiArch = arch;
+			UserDefinedArch = true;
+			Console.WriteLine($"Using the given arch={arch}");
+			if (arch != detectedArch) {
+				Console.WriteLine($"Warning: arch={arch} is not the same as the detected arch={detectedArch}!");
+			}
+		}
+	}
+
+	/**
 	 * Initialize information for the Setup.
 	 */
 	protected void InitEspInfo() {
 		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
-		EfiArch = IntPtr.Size == 4 ? "ia32" : "x64";
 		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
-		if (MsLoader.Arch != null) {
+		if (MsLoader.Arch == null) {
+			Console.WriteLine($"Failed to detect arch from MS boot loader, using arch={EfiArch}.");
+		} else if (MsLoader.Arch == EfiArch || !UserDefinedArch) {
+			Console.WriteLine($"Detected arch={MsLoader.Arch} from MS boot loader, the installer will use that.");
 			EfiArch = MsLoader.Arch;
+		} else {
+			Console.WriteLine($"WARNING: You have set arch={EfiArch}, but detected arch={MsLoader.Arch} from MS boot loader.");
 		}
 	}
 
@@ -423,12 +474,11 @@ public class Setup: SetupHelper {
 	 */
 	protected void RunPrivilegedActions(IEnumerable<string> actions) {
 		if (!HasPrivileges() && !DryRun) {
-			var batchStr = Batch ? "batch" : "";
 			var self = Assembly.GetExecutingAssembly().Location;
 			var arg = String.Join(" ", actions);
 			var result = 0;
 			try {
-				result = RunElevated(self, $"is-elevated {batchStr} {arg}");
+				result = RunElevated(self, $"is-elevated {ForwardArguments} {arg}");
 			} catch (Exception e) {
 				throw new SetupException($"Privileged action ({arg}) failed: {e.Message}");
 			}
@@ -490,7 +540,9 @@ public class Setup: SetupHelper {
 	protected int Run(string[] args) {
 		DryRun = args.Contains("dry-run");
 		Batch = args.Contains("batch");
+		ForwardArguments = String.Join(" ", args.Where(s => s == "dry-run" || s == "batch" || s.StartsWith("arch=")));
 		try {
+			SetArch(args.Prepend("arch=").Last(s => s.StartsWith("arch=")).Substring(5));
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				Console.WriteLine("This installer needs to be run as administrator!");
 				return 1;
