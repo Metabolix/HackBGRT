@@ -40,6 +40,16 @@ public class Setup {
 		}
 	}
 
+	/**
+	 * Boot loader type.
+	 */
+	public enum BootLoaderType {
+		None,
+		Own,
+		Microsoft,
+		Other,
+	}
+
 	/** @var The privileged actions. */
 	protected static readonly string[] privilegedActions = new string[] {
 		"install",
@@ -152,6 +162,44 @@ public class Setup {
 	}
 
 	/**
+	 * Is this HackBGRT's own boot loader?
+	 */
+	public static BootLoaderType DetectLoader(string path) {
+		try {
+			var data = File.ReadAllBytes(path);
+			string tmp = System.Text.Encoding.ASCII.GetString(data);
+			if (tmp.IndexOf("HackBGRT") >= 0 || tmp.IndexOf("HackBgrt") >= 0) {
+				return BootLoaderType.Own;
+			} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
+				return BootLoaderType.Microsoft;
+			} else {
+				return BootLoaderType.Other;
+			}
+		} catch {
+			return BootLoaderType.None;
+		}
+	}
+
+	/**
+	 * Detect the EFI architecture from a file.
+	 */
+	public static string DetectArchFromFile(string path) {
+		try {
+			var data = File.ReadAllBytes(path);
+			var peArch = BitConverter.ToUInt16(data, BitConverter.ToInt32(data, 0x3c) + 4);
+			return peArch switch {
+				0x014c => "ia32",
+				0x0200 => "ia64",
+				0x8664 => "x64",
+				0xaa64 => "aa64",
+				_ => $"unknown-{peArch:x4}"
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	/**
 	 * Find or mount or manually choose the EFI System Partition.
 	 */
 	protected void InitEspPath() {
@@ -177,83 +225,12 @@ public class Setup {
 	}
 
 	/**
-	 * Boot loader type (MS/HackBGRT).
-	 */
-	public enum BootLoaderType {
-		Unknown,
-		MS,
-		Own
-	}
-
-	/**
-	 * Information about a boot loader: type and architecture.
-	 */
-	public class BootLoaderInfo {
-		public string Path;
-		public bool Exists;
-		public BootLoaderType Type;
-		public string Arch;
-
-		/**
-		 * Constructor. Also recognizes the boot loader.
-		 */
-		public BootLoaderInfo(string path) {
-			Path = path;
-			Detect();
-		}
-
-		/**
-		 * Recognize the boot loader type (MS/HackBGRT) and architecture.
-		 */
-		public void Detect() {
-			Exists = false;
-			Type = BootLoaderType.Unknown;
-			Arch = null;
-			try {
-				byte[] data = File.ReadAllBytes(Path);
-				Exists = true;
-				string tmp = System.Text.Encoding.ASCII.GetString(data);
-				if (tmp.IndexOf("HackBGRT") >= 0 || tmp.IndexOf("HackBgrt") >= 0) {
-					Type = BootLoaderType.Own;
-				} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
-					Type = BootLoaderType.MS;
-				}
-				var peArch = BitConverter.ToUInt16(data, BitConverter.ToInt32(data, 0x3c) + 4);
-				Arch = peArch switch {
-					0x014c => "ia32",
-					0x0200 => "ia64",
-					0x8664 => "x64",
-					0xaa64 => "aa64",
-					_ => $"unknown-{peArch:x4}"
-				};
-			} catch {
-			}
-		}
-
-		/**
-		 * Replace this boot loader with another.
-		 *
-		 * @param other The new boot loader.
-		 * @return true if the replacement was successful.
-		 */
-		public bool ReplaceWith(BootLoaderInfo other) {
-			try {
-				File.Copy(other.Path, Path, true);
-			} catch {
-				return false;
-			}
-			Exists = other.Exists;
-			Type = other.Type;
-			Arch = other.Arch;
-			return true;
-		}
-	}
-
-	/**
 	 * Install a single file.
 	 */
-	protected void InstallFile(string name, string newName = null) {
-		newName = Path.Combine(InstallPath, newName == null ? name : newName);
+	protected void InstallFile(string name, string newName = null, bool prependInstallPath = true) {
+		if (prependInstallPath) {
+			newName = Path.Combine(InstallPath, newName == null ? name : newName);
+		}
 		try {
 			File.Copy(name, newName, true);
 		} catch {
@@ -335,37 +312,41 @@ public class Setup {
 	 * Enable HackBGRT by overwriting the MS boot loader.
 	 */
 	protected void OverwriteMsLoader() {
-		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
-		var NewLoader = new BootLoaderInfo(Path.Combine(InstallPath, "loader.efi"));
-		var MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
-		if (MsLoader.Type == BootLoaderType.MS) {
-			if (!MsLoaderBackup.ReplaceWith(MsLoader)) {
-				throw new SetupException("Failed to backup MS boot loader!");
+		var ms = Esp.MsLoaderPath;
+		var backup = BackupLoaderPath;
+		var own = Path.Combine(InstallPath, "loader.efi");
+
+		if (DetectLoader(ms) == BootLoaderType.Microsoft) {
+			InstallFile(ms, backup, false);
+		}
+		if (DetectLoader(backup) != BootLoaderType.Microsoft) {
+			// Duplicate check, but better to be sure...
+			throw new SetupException("Missing MS boot loader backup!");
+		}
+		try {
+			InstallFile(own, ms, false);
+		} catch (SetupException e) {
+			Console.WriteLine(e.Message);
+			if (DetectLoader(ms) != BootLoaderType.Microsoft) {
+				try {
+					InstallFile(backup, ms, false);
+				} catch (SetupException e2) {
+					Console.WriteLine(e2.Message);
+					throw new SetupException("Rollback failed, your system may be unbootable! Create a rescue disk IMMEADIATELY!");
+				}
 			}
 		}
-		if (MsLoaderBackup.Type != BootLoaderType.MS) {
-			// Duplicate check, but better to be sure...
-			throw new SetupException("Failed to detect MS boot loader!");
-		}
-		if (!MsLoader.ReplaceWith(NewLoader)) {
-			MsLoader.ReplaceWith(MsLoaderBackup);
-			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
-		}
-		Console.WriteLine($"Replaced {MsLoader.Path} with this app, stored backup in {MsLoaderBackup.Path}.");
 	}
 
 	/**
 	 * Restore the MS boot loader if it was previously replaced.
 	 */
 	protected void RestoreMsLoader() {
-		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
-		if (MsLoader.Type == BootLoaderType.Own) {
+		var ms = Esp.MsLoaderPath;
+		if (DetectLoader(ms) == BootLoaderType.Own) {
 			Console.WriteLine("Disabling an old version of HackBGRT.");
-			var MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
-			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
-				throw new SetupException("Couldn't restore the old MS loader.");
-			}
-			Console.WriteLine($"{MsLoader.Path} has been restored.");
+			InstallFile(BackupLoaderPath, ms, false);
+			Console.WriteLine($"{ms} has been restored.");
 		}
 	}
 
@@ -494,14 +475,14 @@ public class Setup {
 	 */
 	protected void InitEspInfo() {
 		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
-		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
-		if (MsLoader.Arch == null) {
+		var detectedArch = DetectArchFromFile(Esp.MsLoaderPath);
+		if (detectedArch == null) {
 			Console.WriteLine($"Failed to detect arch from MS boot loader, using arch={EfiArch}.");
-		} else if (MsLoader.Arch == EfiArch || !UserDefinedArch) {
-			Console.WriteLine($"Detected arch={MsLoader.Arch} from MS boot loader, the installer will use that.");
-			EfiArch = MsLoader.Arch;
+		} else if (detectedArch == EfiArch || !UserDefinedArch) {
+			Console.WriteLine($"Detected arch={detectedArch} from MS boot loader, the installer will use that.");
+			EfiArch = detectedArch;
 		} else {
-			Console.WriteLine($"WARNING: You have set arch={EfiArch}, but detected arch={MsLoader.Arch} from MS boot loader.");
+			Console.WriteLine($"WARNING: You have set arch={EfiArch}, but detected arch={detectedArch} from MS boot loader.");
 		}
 	}
 
