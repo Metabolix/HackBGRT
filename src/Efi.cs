@@ -232,7 +232,8 @@ public class Efi {
 	 * @param dryRun Don't actually set the variable.
 	 */
 	private static void SetVariable(Variable v, bool dryRun = false) {
-		Console.WriteLine($"Writing EFI variable {v}");
+		Setup.WriteLine($"Writing EFI variable {v.Name} (see log for details)");
+		Setup.Log($"Writing EFI variable: {v}");
 		if (dryRun) {
 			return;
 		}
@@ -242,7 +243,7 @@ public class Efi {
 			var a = v.Attributes;
 			var b = new byte[] { (byte) a, (byte) (a >> 8), (byte) (a >> 16), (byte) (a >> 24) };
 			// FIXME: Just writing won't work: File.WriteAllBytes(linuxEfiFile, b.Concat(v.Data).ToArray());
-			Console.WriteLine("FIXME: Can't yet write EFI variables in Linux.");
+			Setup.WriteLine("FIXME: Can't yet write EFI variables in Linux.");
 			return;
 		}
 
@@ -334,6 +335,7 @@ public class Efi {
 		if (bootOrder.Data == null) {
 			return false;
 		}
+		Setup.Log($"Read EFI variable: {bootOrder}");
 		var found = false;
 		var bootOrderInts = new List<UInt16>();
 		foreach (var num in BytesToUInt16s(bootOrder.Data)) {
@@ -381,6 +383,8 @@ public class Efi {
 		if (bootCurrent.Data == null) {
 			throw new Exception("MakeBootEntry: Could not read BootCurrent. Maybe your computer is defective.");
 		}
+		Setup.Log($"Read EFI variable: {bootOrder}");
+		Setup.Log($"Read EFI variable: {bootCurrent}");
 		var bootOrderInts = new List<UInt16>(BytesToUInt16s(bootOrder.Data));
 		foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xffff).Select(i => (UInt16) i))) {
 			var entry = GetVariable(String.Format("Boot{0:X04}", num));
@@ -412,6 +416,7 @@ public class Efi {
 		} else if (msEntry == null) {
 			throw new Exception("MakeBootEntry: Windows Boot Manager not found.");
 		} else {
+			Setup.Log($"Read EFI variable: {msEntry}");
 			// Make a new boot entry using the MS entry as a starting point.
 			var entryData = new BootEntryData(msEntry.Data);
 			entryData.Arguments = Encoding.UTF8.GetBytes(label + "\0");

@@ -86,6 +86,24 @@ public class Setup {
 	protected bool Batch;
 
 	/**
+	 * Output a line.
+	 */
+	public static void WriteLine(string s = "") {
+		Console.WriteLine(s);
+		Log(s);
+	}
+
+	/**
+	 * Output a line to the log file.
+	 */
+	public static void Log(string s) {
+		var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+		var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+		var prefix = $"{timestamp} | pid {pid} | ";
+		File.AppendAllText("setup.log", prefix + s.Replace("\n", "\n" + prefix) + "\n");
+	}
+
+	/**
 	 * Start another process.
 	 *
 	 * @param app Path to the application.
@@ -93,11 +111,13 @@ public class Setup {
 	 * @return The started process.
 	 */
 	public static Process StartProcess(string app, string args) {
+		Log($"StartProcess: {app} {args}");
 		try {
 			var info = new ProcessStartInfo(app, args);
 			info.UseShellExecute = false;
 			return Process.Start(info);
-		} catch {
+		} catch (Exception e) {
+			Log($"StartProcess failed: {e.ToString()}");
 			return null;
 		}
 	}
@@ -111,6 +131,7 @@ public class Setup {
 	 * @return The output, or null if the execution failed.
 	 */
 	public static string Execute(string app, string args, bool nullOnFail) {
+		Log($"Execute: {app} {args}");
 		try {
 			var info = new ProcessStartInfo(app, args);
 			info.UseShellExecute = false;
@@ -118,8 +139,10 @@ public class Setup {
 			var p = Process.Start(info);
 			string output = p.StandardOutput.ReadToEnd();
 			p.WaitForExit();
+			Log($"Exit code: {p.ExitCode}, output:\n{output}\n\n");
 			return (nullOnFail && p.ExitCode != 0) ? null : output;
-		} catch {
+		} catch (Exception e) {
+			Log($"Execute failed: {e.ToString()}");
 			return null;
 		}
 	}
@@ -140,7 +163,8 @@ public class Setup {
 			}
 			Efi.EnablePrivilege();
 			return true;
-		} catch {
+		} catch (Exception e) {
+			Log($"HasPrivileges failed: {e.ToString()}");
 		}
 		return false;
 	}
@@ -152,6 +176,7 @@ public class Setup {
 	 * @param args The argument string.
 	 */
 	public static int RunElevated(string app, string args) {
+		Log($"RunElevated: {app} {args}");
 		ProcessStartInfo startInfo = new ProcessStartInfo(app);
 		startInfo.Arguments = args;
 		startInfo.Verb = "runas";
@@ -175,9 +200,12 @@ public class Setup {
 			} else {
 				return BootLoaderType.Other;
 			}
-		} catch {
-			return BootLoaderType.None;
+		} catch (Exception e) when (e is FileNotFoundException || e is DirectoryNotFoundException) {
+			Log($"DetectLoader failed: {path} not found");
+		} catch (Exception e) {
+			Log($"DetectLoader failed: {e.ToString()}");
 		}
+		return BootLoaderType.None;
 	}
 
 	/**
@@ -208,20 +236,21 @@ public class Setup {
 			Esp.TryPath("dry-run", false);
 		}
 		if (Esp.Location == null && !Esp.Find() && !Esp.Mount() && !Batch) {
-			Console.WriteLine("EFI System Partition was not found.");
-			Console.WriteLine("Press enter to exit, or give ESP path here: ");
+			WriteLine("EFI System Partition was not found.");
+			WriteLine("Press enter to exit, or give ESP path here: ");
 			string s = Console.ReadLine();
+			Log($"User input: {s}");
 			if (s.Length == 1) {
 				s = s + ":";
 			}
 			if (!Esp.TryPath(s, true)) {
-				Console.WriteLine("That's not a valid ESP path!");
+				WriteLine("That's not a valid ESP path!");
 			}
 		}
 		if (Esp.Location == null) {
 			throw new SetupException("EFI System Partition was not found.");
 		}
-		Console.WriteLine("EFI System Partition location is " + Esp.Location);
+		WriteLine($"EFI System Partition location is {Esp.Location}");
 	}
 
 	/**
@@ -233,16 +262,18 @@ public class Setup {
 		}
 		try {
 			File.Copy(name, newName, true);
-		} catch {
+		} catch (Exception e) {
+			Log($"InstallFile failed: {e.ToString()}");
 			throw new SetupException($"Failed to install file {name} to {newName}.");
 		}
-		Console.WriteLine($"Installed {name} to {newName}.");
+		WriteLine($"Installed {name} to {newName}.");
 	}
 
 	/**
 	 * Install a single image file, with conversion to 24-bit BMP.
 	 */
 	protected void InstallImageFile(string name) {
+		Log($"InstallImageFile: {name}");
 		var newName = Path.Combine(InstallPath, name);
 		// Load the image to check if it's valid.
 		Bitmap img;
@@ -262,7 +293,7 @@ public class Setup {
 				throw new SetupException($"Failed to install image {name} to {newName}.");
 			}
 		}
-		Console.WriteLine($"Installed image {name} to {newName}.");
+		WriteLine($"Installed image {name} to {newName}.");
 	}
 
 	/**
@@ -281,7 +312,9 @@ public class Setup {
 		}
 
 		InstallFile("config.txt");
-		foreach (var line in File.ReadAllLines("config.txt").Where(s => s.StartsWith("image="))) {
+		var lines = File.ReadAllLines("config.txt");
+		Log($"config.txt:\n{String.Join("\n", lines)}");
+		foreach (var line in lines.Where(s => s.StartsWith("image="))) {
 			var delim = "path=\\EFI\\HackBGRT\\";
 			var i = line.IndexOf(delim);
 			if (i > 0) {
@@ -289,7 +322,7 @@ public class Setup {
 			}
 		}
 		InstallFile($"boot{EfiArch}.efi", "loader.efi");
-		Console.WriteLine($"HackBGRT has been copied to {InstallPath}.");
+		WriteLine($"HackBGRT has been copied to {InstallPath}.");
 	}
 
 	/**
@@ -297,7 +330,7 @@ public class Setup {
 	 */
 	protected void EnableEntry() {
 		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
-		Console.WriteLine("Enabled NVRAM entry for HackBGRT.");
+		WriteLine("Enabled NVRAM entry for HackBGRT.");
 	}
 
 	/**
@@ -305,7 +338,7 @@ public class Setup {
 	 */
 	protected void DisableEntry() {
 		Efi.DisableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
-		Console.WriteLine("Disabled NVRAM entry for HackBGRT.");
+		WriteLine("Disabled NVRAM entry for HackBGRT.");
 	}
 
 	/**
@@ -326,12 +359,12 @@ public class Setup {
 		try {
 			InstallFile(own, ms, false);
 		} catch (SetupException e) {
-			Console.WriteLine(e.Message);
+			WriteLine(e.Message);
 			if (DetectLoader(ms) != BootLoaderType.Microsoft) {
 				try {
 					InstallFile(backup, ms, false);
 				} catch (SetupException e2) {
-					Console.WriteLine(e2.Message);
+					WriteLine(e2.Message);
 					throw new SetupException("Rollback failed, your system may be unbootable! Create a rescue disk IMMEADIATELY!");
 				}
 			}
@@ -344,9 +377,9 @@ public class Setup {
 	protected void RestoreMsLoader() {
 		var ms = Esp.MsLoaderPath;
 		if (DetectLoader(ms) == BootLoaderType.Own) {
-			Console.WriteLine("Disabling an old version of HackBGRT.");
+			WriteLine("Disabling an old version of HackBGRT.");
 			InstallFile(BackupLoaderPath, ms, false);
-			Console.WriteLine($"{ms} has been restored.");
+			WriteLine($"{ms} has been restored.");
 		}
 	}
 
@@ -354,20 +387,20 @@ public class Setup {
 	 * Configure HackBGRT.
 	 */
 	protected void Configure() {
-		Console.WriteLine("This setup program lets you edit just one image.");
-		Console.WriteLine("Edit config.txt manually for advanced configuration.");
+		WriteLine("This setup program lets you edit just one image.");
+		WriteLine("Edit config.txt manually for advanced configuration.");
 
 		// Open splash.bmp in mspaint.
-		Console.WriteLine("Draw or copy your preferred image to splash.bmp.");
+		WriteLine("Draw or copy your preferred image to splash.bmp.");
 		try {
 			StartProcess("mspaint", "splash.bmp").WaitForExit();
 		} catch {
-			Console.WriteLine("Editing splash.bmp with mspaint failed!");
-			Console.WriteLine("Edit splash.bmp with your preferred editor.");
-			Console.WriteLine("Press any key to continue.");
+			WriteLine("Editing splash.bmp with mspaint failed!");
+			WriteLine("Edit splash.bmp with your preferred editor.");
+			WriteLine("Press any key to continue.");
 			Console.ReadKey();
 		}
-		Console.WriteLine();
+		WriteLine();
 	}
 
 	/**
@@ -378,8 +411,9 @@ public class Setup {
 		DisableEntry();
 		try {
 			Directory.Delete(InstallPath, true);
-			Console.WriteLine($"HackBGRT has been removed from {InstallPath}.");
-		} catch {
+			WriteLine($"HackBGRT has been removed from {InstallPath}.");
+		} catch (Exception e) {
+			Log($"Uninstall failed: {e.ToString()}");
 			throw new SetupException($"The directory {InstallPath} couldn't be removed.");
 		}
 	}
@@ -392,41 +426,44 @@ public class Setup {
 	protected void HandleSecureBoot(bool allowSecureBoot) {
 		int secureBoot = Efi.GetSecureBootStatus();
 		if (secureBoot == 0) {
-			Console.WriteLine("Secure Boot is disabled, good!");
+			WriteLine("Secure Boot is disabled, good!");
 		} else {
 			if (secureBoot == 1) {
-				Console.WriteLine("Secure Boot is probably enabled.");
+				WriteLine("Secure Boot is probably enabled.");
 			} else {
-				Console.WriteLine("Secure Boot status could not be determined.");
+				WriteLine("Secure Boot status could not be determined.");
 			}
-			Console.WriteLine("It's very important to disable Secure Boot before installing.");
-			Console.WriteLine("Otherwise your machine may become unbootable.");
+			WriteLine("It's very important to disable Secure Boot before installing.");
+			WriteLine("Otherwise your machine may become unbootable.");
 			if (Batch) {
 				if (allowSecureBoot) {
 					return;
 				}
 				throw new SetupException("Aborting because of Secure Boot.");
 			}
-			Console.WriteLine("Choose action (press a key):");
+			WriteLine("Choose action (press a key):");
 			bool canBootToFW = Efi.CanBootToFW();
 			if (canBootToFW) {
-				Console.WriteLine(" S = Enter EFI Setup to disable Secure Boot manually; requires reboot!");
+				WriteLine(" S = Enter EFI Setup to disable Secure Boot manually; requires reboot!");
 			}
-			Console.WriteLine(" I = Install anyway; THIS MAY BE DANGEROUS!");
-			Console.WriteLine(" C = Cancel");
+			WriteLine(" I = Install anyway; THIS MAY BE DANGEROUS!");
+			WriteLine(" C = Cancel");
 			var k = Console.ReadKey().Key;
-			Console.WriteLine();
+			Log($"User input: {k}");
+			WriteLine();
 			if (k == ConsoleKey.I) {
-				Console.WriteLine("Continuing. THIS MAY BE DANGEROUS!");
+				WriteLine("Continuing. THIS MAY BE DANGEROUS!");
 			} else if (canBootToFW && k == ConsoleKey.S) {
 				Efi.SetBootToFW();
-				Console.WriteLine();
-				Console.WriteLine("Reboot your computer. You will then automatically enter the UEFI setup.");
-				Console.WriteLine("Find and disable Secure Boot, then save and exit, then run this installer.");
-				Console.WriteLine("Press R to reboot now, other key to exit.");
+				WriteLine();
+				WriteLine("Reboot your computer. You will then automatically enter the UEFI setup.");
+				WriteLine("Find and disable Secure Boot, then save and exit, then run this installer.");
+				WriteLine("Press R to reboot now, other key to exit.");
 				var k2 = Console.ReadKey().Key;
-				Console.WriteLine();
+				Log($"User input: {k2}");
+				WriteLine();
 				if (k2 == ConsoleKey.R) {
+					WriteLine("Rebooting now...");
 					StartProcess("shutdown", "-f -r -t 1");
 				}
 				throw new ExitSetup(0);
@@ -459,13 +496,13 @@ public class Setup {
 		var detectedArch = DetectArchFromOS();
 		if (arch == "") {
 			EfiArch = detectedArch;
-			Console.WriteLine($"Your OS uses arch={EfiArch}. This will be checked again during installation.");
+			WriteLine($"Your OS uses arch={EfiArch}. This will be checked again during installation.");
 		} else {
 			EfiArch = arch;
 			UserDefinedArch = true;
-			Console.WriteLine($"Using the given arch={arch}");
+			WriteLine($"Using the given arch={arch}");
 			if (arch != detectedArch) {
-				Console.WriteLine($"Warning: arch={arch} is not the same as the detected arch={detectedArch}!");
+				WriteLine($"Warning: arch={arch} is not the same as the detected arch={detectedArch}!");
 			}
 		}
 	}
@@ -477,12 +514,12 @@ public class Setup {
 		InstallPath = Path.Combine(Esp.Location, "EFI", "HackBGRT");
 		var detectedArch = DetectArchFromFile(Esp.MsLoaderPath);
 		if (detectedArch == null) {
-			Console.WriteLine($"Failed to detect arch from MS boot loader, using arch={EfiArch}.");
+			WriteLine($"Failed to detect arch from MS boot loader, using arch={EfiArch}.");
 		} else if (detectedArch == EfiArch || !UserDefinedArch) {
-			Console.WriteLine($"Detected arch={detectedArch} from MS boot loader, the installer will use that.");
+			WriteLine($"Detected arch={detectedArch} from MS boot loader, the installer will use that.");
 			EfiArch = detectedArch;
 		} else {
-			Console.WriteLine($"WARNING: You have set arch={EfiArch}, but detected arch={detectedArch} from MS boot loader.");
+			WriteLine($"WARNING: You have set arch={EfiArch}, but detected arch={detectedArch} from MS boot loader.");
 		}
 	}
 
@@ -490,26 +527,27 @@ public class Setup {
 	 * Ask for user's choice and install/uninstall.
 	 */
 	protected void ShowMenu() {
-		Console.WriteLine();
-		Console.WriteLine("Choose action (press a key):");
-		Console.WriteLine(" I = install");
-		Console.WriteLine("     - creates a new EFI boot entry for HackBGRT");
-		Console.WriteLine("     - sometimes needs to be enabled in firmware settings");
-		Console.WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
-		Console.WriteLine(" O = install (legacy)");
-		Console.WriteLine("     - overwrites the MS boot loader");
-		Console.WriteLine("     - may require re-install after Windows updates");
-		Console.WriteLine("     - could brick your system if configured incorrectly");
-		Console.WriteLine(" F = install files only");
-		Console.WriteLine("     - needs to be enabled somehow");
-		Console.WriteLine(" D = disable");
-		Console.WriteLine("     - removes created entries, restores MS boot loader");
-		Console.WriteLine(" R = remove completely");
-		Console.WriteLine("     - disables, then deletes all files and images");
-		Console.WriteLine(" C = cancel");
+		WriteLine();
+		WriteLine("Choose action (press a key):");
+		WriteLine(" I = install");
+		WriteLine("     - creates a new EFI boot entry for HackBGRT");
+		WriteLine("     - sometimes needs to be enabled in firmware settings");
+		WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
+		WriteLine(" O = install (legacy)");
+		WriteLine("     - overwrites the MS boot loader");
+		WriteLine("     - may require re-install after Windows updates");
+		WriteLine("     - could brick your system if configured incorrectly");
+		WriteLine(" F = install files only");
+		WriteLine("     - needs to be enabled somehow");
+		WriteLine(" D = disable");
+		WriteLine("     - removes created entries, restores MS boot loader");
+		WriteLine(" R = remove completely");
+		WriteLine("     - disables, then deletes all files and images");
+		WriteLine(" C = cancel");
 
 		var k = Console.ReadKey().Key;
-		Console.WriteLine();
+		Log($"User input: {k}");
+		WriteLine();
 		if (k == ConsoleKey.I || k == ConsoleKey.O || k == ConsoleKey.F) {
 			Configure();
 		}
@@ -536,19 +574,21 @@ public class Setup {
 	 * @param actions The actions to run.
 	 */
 	protected void RunPrivilegedActions(IEnumerable<string> actions) {
+		var args = String.Join(" ", actions);
+		Log($"RunPrivilegedActions: {args}");
 		if (!HasPrivileges() && !DryRun) {
 			var self = Assembly.GetExecutingAssembly().Location;
-			var arg = String.Join(" ", actions);
 			var result = 0;
 			try {
-				result = RunElevated(self, $"is-elevated {ForwardArguments} {arg}");
+				result = RunElevated(self, $"is-elevated {ForwardArguments} {args}");
 			} catch (Exception e) {
-				throw new SetupException($"Privileged action ({arg}) failed: {e.Message}");
+				Setup.Log(e.ToString());
+				throw new SetupException($"Privileged action ({args}) failed: {e.Message}");
 			}
 			if (result != 0) {
-				throw new SetupException($"Privileged action ({arg}) failed!");
+				throw new SetupException($"Privileged action ({args}) failed!");
 			}
-			Console.WriteLine($"Privileged action ({arg}) completed.");
+			WriteLine($"Privileged action ({args}) completed.");
 			return;
 		}
 
@@ -579,7 +619,7 @@ public class Setup {
 			} else {
 				throw new SetupException($"Invalid action: '{arg}'!");
 			}
-			Console.WriteLine($"Completed action '{arg}' successfully.");
+			WriteLine($"Completed action '{arg}' successfully.");
 		}
 	}
 
@@ -589,9 +629,10 @@ public class Setup {
 	 * @param args The arguments.
 	 */
 	public static void Main(string[] args) {
-		Console.WriteLine($"HackBGRT installer version: {Version}");
 		var self = Assembly.GetExecutingAssembly().Location;
 		Directory.SetCurrentDirectory(Path.GetDirectoryName(self));
+		WriteLine($"HackBGRT installer version: {Version}");
+		Log($"Args: {String.Join(" ", args)}");
 		Environment.ExitCode = new Setup().Run(args);
 	}
 
@@ -607,7 +648,7 @@ public class Setup {
 		try {
 			SetArch(args.Prepend("arch=").Last(s => s.StartsWith("arch=")).Substring(5));
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
-				Console.WriteLine("This installer needs to be run as administrator!");
+				WriteLine("This installer needs to be run as administrator!");
 				return 1;
 			}
 			var actions = args.Where(s => privilegedActions.Contains(s));
@@ -619,22 +660,29 @@ public class Setup {
 				throw new SetupException("No action specified!");
 			}
 			ShowMenu();
+			WriteLine();
+			WriteLine("All done!");
 			return 0;
 		} catch (ExitSetup e) {
 			return e.Code;
 		} catch (SetupException e) {
-			Console.WriteLine("Error: {0}", e.Message);
+			WriteLine();
+			WriteLine($"Error: {e.Message}");
+			Log(e.ToString());
 			return 1;
 		} catch (Exception e) {
-			Console.WriteLine("Unexpected error!\n{0}", e.ToString());
-			Console.WriteLine("If this is the most current release, please report this bug.");
+			WriteLine();
+			WriteLine($"Unexpected error: {e.Message}");
+			Log(e.ToString());
+			WriteLine("If this is the most current release, please report this bug.");
 			return 1;
 		} finally {
 			if (DryRun) {
-				Console.WriteLine("This was a dry run, your system was not actually modified.");
+				WriteLine("This was a dry run, your system was not actually modified.");
 			}
 			if (!Batch) {
-				Console.WriteLine("Press any key to quit.");
+				WriteLine("If you need to report a bug, please include the setup.log file.");
+				WriteLine("Press any key to quit.");
 				Console.ReadKey();
 			}
 		}
