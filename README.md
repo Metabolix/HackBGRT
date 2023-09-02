@@ -33,6 +33,7 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
 	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
+	* `allow-bad-loader` – ignore bad boot loader configuration in subsequent commands.
 	* `disable` – run all relevant `disable-*` commands.
 	* `uninstall` – disable and remove completely.
 * For example, run `setup.exe batch install allow-secure-boot enable-overwrite` to copy files and overwrite the MS boot loader regardless of Secure Boot status.

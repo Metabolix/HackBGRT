@@ -54,6 +54,7 @@ public class Setup {
 	protected static readonly string[] privilegedActions = new string[] {
 		"install",
 		"allow-secure-boot",
+		"allow-bad-loader",
 		"enable-entry", "disable-entry",
 		"enable-overwrite", "disable-overwrite",
 		"disable",
@@ -381,6 +382,43 @@ public class Setup {
 			InstallFile(BackupLoaderPath, ms, false);
 			WriteLine($"{ms} has been restored.");
 		}
+		if (DetectLoader(BackupLoaderPath) == BootLoaderType.Own) {
+			File.Delete(BackupLoaderPath);
+			WriteLine($"{BackupLoaderPath} was messed up and has been removed.");
+		}
+	}
+
+	/**
+	 * Check that config.txt has a reasonable boot loader line.
+	 */
+	protected void VerifyLoaderConfig() {
+		var lines = File.ReadAllLines("config.txt");
+		var loader = lines.Where(s => s.StartsWith("boot=")).Select(s => s.Substring(5)).Prepend("").Last();
+		if (loader == null) {
+			throw new SetupException("config.txt does not contain a boot=... line!");
+		}
+		WriteLine($"Verifying config: boot={loader}");
+		if (loader == "MS") {
+			var backup = BackupLoaderPath;
+			var type = DetectLoader(backup);
+			if (type == BootLoaderType.Own) {
+				throw new SetupException($"boot=MS = {backup} = HackBGRT. Prepare your rescue disk!");
+			}
+			if (type == BootLoaderType.None) {
+				if (DetectLoader(Esp.MsLoaderPath) != BootLoaderType.Microsoft) {
+					throw new SetupException("config.txt contains boot=MS, but MS boot loader is not found!");
+				}
+			}
+		} else if (!loader.StartsWith("\\")) {
+			throw new SetupException($"Boot loader must be boot=MS or boot=\\valid\\path!");
+		} else {
+			switch (DetectLoader(Path.Combine(Esp.Location, loader.Substring(1).Replace("\\", Path.DirectorySeparatorChar.ToString())))) {
+				case BootLoaderType.Own:
+					throw new SetupException($"Boot loader points back to HackBGRT!");
+				case BootLoaderType.None:
+					throw new SetupException($"Boot loader does not exist!");
+			}
+		}
 	}
 
 	/**
@@ -594,21 +632,39 @@ public class Setup {
 
 		InitEspPath();
 		InitEspInfo();
-		bool allowSecureBoot = false;
+		bool allowSecureBoot = false, allowBadLoader = false;
+		Action<Action> verify = (Action revert) => {
+			try {
+				VerifyLoaderConfig();
+			} catch (SetupException e) {
+				if (allowBadLoader) {
+					WriteLine($"Warning: {e.Message}");
+				} else {
+					WriteLine($"Error: {e.Message}");
+					WriteLine($"Reverting. Use batch mode with allow-bad-loader to override.");
+					revert();
+					throw new SetupException("Check your configuration and try again.");
+				}
+			}
+		};
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
 			if (arg == "install") {
 				InstallFiles();
 			} else if (arg == "allow-secure-boot") {
 				allowSecureBoot = true;
+			} else if (arg == "allow-bad-loader") {
+				allowBadLoader = true;
 			} else if (arg == "enable-entry") {
 				HandleSecureBoot(allowSecureBoot);
 				EnableEntry();
+				verify(() => DisableEntry());
 			} else if (arg == "disable-entry") {
 				DisableEntry();
 			} else if (arg == "enable-overwrite") {
 				HandleSecureBoot(allowSecureBoot);
 				OverwriteMsLoader();
+				verify(() => RestoreMsLoader());
 			} else if (arg == "disable-overwrite") {
 				RestoreMsLoader();
 			} else if (arg == "disable") {
