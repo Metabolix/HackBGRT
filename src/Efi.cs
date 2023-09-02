@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -42,6 +45,92 @@ public class Efi {
 		public string Name, Guid;
 		public UInt32 Attributes;
 		public byte[] Data;
+
+		/**
+		 * Convert to string.
+		 *
+		 * @return String representation of this object.
+		 */
+		public override string ToString() {
+			var hex = BitConverter.ToString(Data).Replace("-", " ");
+			var text = new string(Data.Select(c => 0x20 <= c && c <= 0x7f ? (char) c : ' ').ToArray());
+			return $"{Name} Guid={Guid} Attributes={Attributes} Text='{text}' Bytes='{hex}'";
+		}
+	}
+
+	/**
+	 * Information about an EFI boot entry.
+	 */
+	public class BootEntryData {
+		public UInt32 Attributes;
+		public string Label;
+		public class DevicePathNode {
+			public byte Type, SubType;
+			public byte[] Data;
+			public DevicePathNode(byte[] data) {
+				Type = data[0];
+				SubType = data[1];
+				Data = data.Skip(4).ToArray();
+			}
+			public byte[] ToBytes() {
+				var len = Data.Length + 4;
+				return new byte[] { Type, SubType, (byte)(len & 0xff), (byte)(len >> 8) }.Concat(Data).ToArray();
+			}
+		}
+		public List<DevicePathNode> DevicePathNodes;
+		public byte[] Arguments;
+
+		public BootEntryData(byte[] data) {
+			Attributes = BitConverter.ToUInt32(data, 0);
+			var pathNodesLength = BitConverter.ToUInt16(data, 4);
+			Label = new string(BytesToUInt16s(data).Skip(3).TakeWhile(i => i != 0).Select(i => (char)i).ToArray());
+			var pos = 6 + 2 * (Label.Length + 1);
+			var pathNodesEnd = pos + pathNodesLength;
+			DevicePathNodes = new List<DevicePathNode>();
+			while (pos + 4 <= pathNodesEnd) {
+				var len = BitConverter.ToUInt16(data, pos + 2);
+				if (len < 4 || pos + len > pathNodesEnd) {
+					return; // throw new Exception("Bad entry.");
+				}
+				DevicePathNodes.Add(new DevicePathNode(data.Skip(pos).Take(len).ToArray()));
+				pos += len;
+			}
+			Arguments = data.Skip(pathNodesEnd).ToArray();
+		}
+		public byte[] ToBytes() {
+			return new byte[0]
+				.Concat(BitConverter.GetBytes((UInt32) Attributes))
+				.Concat(BitConverter.GetBytes((UInt16) DevicePathNodes.Sum(n => n.Data.Length + 4)))
+				.Concat(Encoding.Unicode.GetBytes(Label + "\0"))
+				.Concat(DevicePathNodes.SelectMany(n => n.ToBytes()))
+				.Concat(Arguments)
+				.ToArray();
+		}
+		public DevicePathNode FileNameNode {
+			get {
+				var d = DevicePathNodes;
+				return d.Count > 1 && d[d.Count - 1].Type == 0x7F && d[d.Count - 2].Type == 0x04 ? d[d.Count - 2] : null;
+			}
+		}
+		public bool HasFileName {
+			get {
+				return FileNameNode != null;
+			}
+		}
+		public string FileName {
+			get {
+				if (!HasFileName) {
+					return "";
+				}
+				return new string(Encoding.Unicode.GetChars(FileNameNode.Data).TakeWhile(c => c != '\0').ToArray());
+			}
+			set {
+				if (!HasFileName) {
+					throw new Exception("Logic error: Setting FileName on a bad boot entry.");
+				}
+				FileNameNode.Data = Encoding.Unicode.GetBytes(value + "\0");
+			}
+		}
 	}
 
 	public const string EFI_GLOBAL_GUID = "{8be4df61-93ca-11d2-aa0d-00e098032b8c}";
@@ -117,17 +206,23 @@ public class Efi {
 	 * Set an EFI variable.
 	 *
 	 * @param v Information of the variable.
+	 * @param dryRun Don't actually set the variable.
 	 */
-	private static void SetVariable(Variable v) {
+	private static void SetVariable(Variable v, bool dryRun = false) {
+		Console.WriteLine($"Writing EFI variable {v}");
+		if (dryRun) {
+			return;
+		}
+
 		UInt32 r = SetFirmwareEnvironmentVariableEx(v.Name, v.Guid, v.Data, (UInt32) v.Data.Length, v.Attributes);
 		if (r == 0) {
 			switch (Marshal.GetLastWin32Error()) {
 				case 87:
-					throw new Exception("GetVariable: Invalid parameter");
+					throw new Exception("SetVariable: Invalid parameter");
 				case 1314:
-					throw new Exception("GetVariable: Privilege not held");
+					throw new Exception("SetVariable: Privilege not held");
 				default:
-					throw new Exception("GetVariable: error " + Marshal.GetLastWin32Error());
+					throw new Exception("SetVariable: error " + Marshal.GetLastWin32Error());
 			}
 		}
 	}
@@ -176,5 +271,137 @@ public class Efi {
 		}
 		tmp.Data[0] |= 1;
 		SetVariable(tmp);
+	}
+
+	/**
+	 * Convert bytes into UInt16 values.
+	 *
+	 * @param bytes The byte array.
+	 * @return An enumeration of UInt16 values.
+	 */
+	public static IEnumerable<UInt16> BytesToUInt16s(byte[] bytes) {
+		// TODO: return bytes.Chunk(2).Select(b => (UInt16) (b[0] + 0x100 * b[1])).ToArray();
+		return Enumerable.Range(0, bytes.Length / 2).Select(i => (UInt16) (bytes[2 * i] + 0x100 * bytes[2 * i + 1]));
+	}
+
+	/**
+	 * Disable the said boot entry from BootOrder.
+	 *
+	 * @param label Label of the boot entry.
+	 * @param fileName File name of the boot entry.
+	 * @param dryRun Don't actually disable the entry.
+	 * @return True, if the entry was found in BootOrder.
+	 */
+	public static bool DisableBootEntry(string label, string fileName, bool dryRun = false) {
+		Variable bootOrder;
+		try {
+			bootOrder = GetVariable("BootOrder");
+		} catch {
+			return false;
+		}
+		if (bootOrder.Data == null) {
+			return false;
+		}
+		var found = false;
+		var bootOrderInts = new List<UInt16>();
+		foreach (var num in BytesToUInt16s(bootOrder.Data)) {
+			var entry = GetVariable(String.Format("Boot{0:X04}", num));
+			if (entry.Data != null) {
+				var entryData = new BootEntryData(entry.Data);
+				if (entryData.Label == label && entryData.FileName == fileName) {
+					found = true;
+					continue;
+				}
+			}
+			bootOrderInts.Add(num);
+		}
+		if (found) {
+			bootOrder.Data = bootOrderInts.SelectMany(num => new byte[] { (byte)(num & 0xff), (byte)(num >> 8) }).ToArray();
+			SetVariable(bootOrder, dryRun);
+		}
+		return found;
+	}
+
+	/**
+	 * Create and enable the said boot entry from BootOrder.
+	 *
+	 * @param label Label of the boot entry.
+	 * @param fileName File name of the boot entry.
+	 * @param dryRun Don't actually create the entry.
+	 */
+	public static void MakeAndEnableBootEntry(string label, string fileName, bool dryRun = false) {
+		Variable msEntry = null, ownEntry = null;
+		UInt16 msNum = 0, ownNum = 0;
+
+		// Find a free entry and the MS bootloader entry.
+		Variable bootOrder = null;
+		try {
+			bootOrder = GetVariable("BootOrder");
+		} catch {
+			if (dryRun) {
+				return;
+			}
+		}
+		if (bootOrder == null || bootOrder.Data == null) {
+			throw new Exception("MakeBootEntry: Could not read BootOrder. Maybe your computer is defective.");
+		}
+		var bootCurrent = GetVariable("BootCurrent");
+		if (bootCurrent.Data == null) {
+			throw new Exception("MakeBootEntry: Could not read BootCurrent. Maybe your computer is defective.");
+		}
+		var bootOrderInts = new List<UInt16>(BytesToUInt16s(bootOrder.Data));
+		foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xffff).Select(i => (UInt16) i))) {
+			var entry = GetVariable(String.Format("Boot{0:X04}", num));
+			if (entry.Data == null) {
+				if (ownEntry == null) {
+					ownNum = num;
+					ownEntry = entry;
+				}
+			} else {
+				var entryData = new BootEntryData(entry.Data);
+				if (!entryData.HasFileName) {
+					continue;
+				}
+				if (entryData.Label == label && entryData.FileName == fileName) {
+					ownNum = num;
+					ownEntry = entry;
+				}
+				if (msEntry == null && entryData.FileName.StartsWith("\\EFI\\Microsoft\\Boot\\bootmgfw.efi", StringComparison.OrdinalIgnoreCase)) {
+					msNum = num;
+					msEntry = entry;
+				}
+			}
+			if (ownEntry != null && msEntry != null) {
+				break;
+			}
+		}
+		if (ownEntry == null) {
+			throw new Exception("MakeBootEntry: Boot entry list is full.");
+		} else if (msEntry == null) {
+			throw new Exception("MakeBootEntry: Windows Boot Manager not found.");
+		} else {
+			// Make a new boot entry using the MS entry as a starting point.
+			var entryData = new BootEntryData(msEntry.Data);
+			entryData.Arguments = Encoding.UTF8.GetBytes(label + "\0");
+			entryData.Attributes = 1; // LOAD_OPTION_ACTIVE
+			entryData.Label = label;
+			entryData.FileName = fileName;
+			ownEntry.Attributes = 7; // EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS
+			ownEntry.Data = entryData.ToBytes();
+			SetVariable(ownEntry, dryRun);
+		}
+
+		var msPos = bootOrderInts.IndexOf(msNum);
+		var ownPos = bootOrderInts.IndexOf(ownNum);
+		var mustAdd = ownPos == -1;
+		var mustMove = 0 <= msPos && msPos <= ownPos;
+		if (mustAdd || mustMove) {
+			if (mustMove) {
+				bootOrderInts.RemoveAt(ownPos);
+			}
+			bootOrderInts.Insert(msPos < 0 ? 0 : msPos, ownNum);
+			bootOrder.Data = bootOrderInts.SelectMany(num => new byte[] { (byte)(num & 0xff), (byte)(num >> 8) }).ToArray();
+			SetVariable(bootOrder, dryRun);
+		}
 	}
 }

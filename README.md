@@ -28,6 +28,8 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 * Edit the `config.txt` and `splash.bmp` (or any other images) to your needs.
 * Run `setup.exe batch COMMANDS` as administrator, with some of the following commands:
 	* `install` – copy the files but don't enable.
+	* `enable-entry` – create a new EFI boot entry.
+	* `disable-entry` – disable the EFI boot entry.
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
 	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
@@ -45,8 +47,7 @@ If you only need HackBGRT for Windows:
 If you need it for other systems as well:
 
 * Configure HackBGRT to start your boot loader (such as systemd-boot): `boot=\EFI\systemd\systemd-bootx64.efi`.
-* Run `setup.exe`, install files.
-* Set `\EFI\HackBGRT\loader.efi` as your default boot loader with `efibootmgr` or some other EFI boot manager tool.
+* Run `setup.exe`, install as a new EFI boot entry.
 
 To install purely on Linux, you can install with `setup.exe dry-run` and then manually copy files from `dry-run/EFI` to your `[EFI System Partition]/EFI`. For further instructions, consult the documentation of your own Linux system.
 
@@ -64,10 +65,7 @@ Advanced users may edit the `config.txt` to define multiple images, in which cas
 
 ## Recovery
 
-If something breaks and you can't boot to Windows, you have the following options:
-
-* Windows installation (or recovery) media can fix boot issues.
-* You can copy `[EFI System Partition]\EFI\HackBGRT\bootmgfw-original.efi` into `[EFI System Partition]\EFI\Microsoft\Boot\bootmgfw.efi` by some other means such as Linux or Windows command prompt.
+If something breaks and you can't boot to Windows, you need to use the Windows installation disk (or recovery disk) to fix boot issues.
 
 ## Building
 

@@ -324,6 +324,19 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 }
 
 /**
+ * Load an application.
+ */
+static EFI_HANDLE LoadApp(print_t* print_failure, EFI_HANDLE image_handle, EFI_LOADED_IMAGE* image, const CHAR16* path) {
+	EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) path);
+	EFI_HANDLE result = 0;
+	Debug(L"HackBGRT: Loading application %s.\n", path);
+	if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &result))) {
+		print_failure(L"HackBGRT: Failed to load application %s.\n", path);
+	}
+	return result;
+}
+
+/**
  * The main program.
  */
 EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
@@ -356,29 +369,34 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	HackBgrt(root_dir);
 
 	EFI_HANDLE next_image_handle = 0;
-	if (!config.boot_path) {
-		Print(L"HackBGRT: Boot path not specified.\n");
+	static CHAR16 backup_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";
+	static CHAR16 ms_boot_path[] = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
+
+	if (config.boot_path && StriCmp(config.boot_path, L"MS") != 0) {
+		next_image_handle = LoadApp(Print, image_handle, image, config.boot_path);
 	} else {
-		Debug(L"HackBGRT: Loading application %s.\n", config.boot_path);
-		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) config.boot_path);
-		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-			Print(L"HackBGRT: Failed to load application %s.\n", config.boot_path);
+		config.boot_path = backup_boot_path;
+		next_image_handle = LoadApp(Debug, image_handle, image, config.boot_path);
+		if (!next_image_handle) {
+			config.boot_path = ms_boot_path;
+			next_image_handle = LoadApp(Debug, image_handle, image, config.boot_path);
 		}
 	}
 	if (!next_image_handle) {
-		static CHAR16 default_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";
-		Debug(L"HackBGRT: Loading application %s.\n", default_boot_path);
-		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, default_boot_path);
-		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-			Print(L"HackBGRT: Also failed to load application %s.\n", default_boot_path);
-			goto fail;
+		config.boot_path = backup_boot_path;
+		next_image_handle = LoadApp(Print, image_handle, image, config.boot_path);
+		if (!next_image_handle) {
+			config.boot_path = ms_boot_path;
+			next_image_handle = LoadApp(Print, image_handle, image, config.boot_path);
+			if (!next_image_handle) {
+				goto fail;
+			}
 		}
-		Print(L"HackBGRT: Reverting to %s.\n", default_boot_path);
+		Print(L"HackBGRT: Reverting to %s.\n", config.boot_path);
 		Print(L"Press escape to cancel, any other key to boot.\n");
 		if (ReadKey().ScanCode == SCAN_ESC) {
 			goto fail;
 		}
-		config.boot_path = default_boot_path;
 	}
 	if (config.debug) {
 		Print(L"HackBGRT: Ready to boot.\nPress escape to cancel, any other key to boot.\n");

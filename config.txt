@@ -1,8 +1,8 @@
 ﻿# vim: set fileencoding=utf-8
 # The same options may be given also as command line parameters in the EFI Shell, which is useful for debugging.
 
-# Boot loader path. Default: backup of the Windows boot loader.
-boot=\EFI\HackBGRT\bootmgfw-original.efi
+# Boot loader path. MS = either backup or original Windows boot loader.
+boot=MS
 
 # The image is specified with an image line.
 # Multiple image lines may be present, in which case one will be picked by random.

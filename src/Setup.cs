@@ -41,6 +41,7 @@ public class Setup: SetupHelper {
 	protected static readonly string[] privilegedActions = new string[] {
 		"install",
 		"allow-secure-boot",
+		"enable-entry", "disable-entry",
 		"enable-overwrite", "disable-overwrite",
 		"disable",
 		"uninstall",
@@ -220,6 +221,22 @@ public class Setup: SetupHelper {
 	}
 
 	/**
+	 * Enable HackBGRT boot entry.
+	 */
+	protected void EnableEntry() {
+		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
+		Console.WriteLine("Enabled NVRAM entry for HackBGRT.");
+	}
+
+	/**
+	 * Disable HackBGRT boot entry.
+	 */
+	protected void DisableEntry() {
+		Efi.DisableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
+		Console.WriteLine("Disabled NVRAM entry for HackBGRT.");
+	}
+
+	/**
 	 * Enable HackBGRT by overwriting the MS boot loader.
 	 */
 	protected void OverwriteMsLoader() {
@@ -248,6 +265,7 @@ public class Setup: SetupHelper {
 	protected void RestoreMsLoader() {
 		var MsLoader = new BootLoaderInfo(Esp.MsLoaderPath);
 		if (MsLoader.Type == BootLoaderType.Own) {
+			Console.WriteLine("Disabling an old version of HackBGRT.");
 			var MsLoaderBackup = new BootLoaderInfo(BackupLoaderPath);
 			if (!MsLoader.ReplaceWith(MsLoaderBackup)) {
 				throw new SetupException("Couldn't restore the old MS loader.");
@@ -281,6 +299,7 @@ public class Setup: SetupHelper {
 	 */
 	protected void Uninstall() {
 		RestoreMsLoader();
+		DisableEntry();
 		try {
 			Directory.Delete(InstallPath, true);
 			Console.WriteLine($"HackBGRT has been removed from {InstallPath}.");
@@ -359,18 +378,30 @@ public class Setup: SetupHelper {
 	protected void ShowMenu() {
 		Console.WriteLine();
 		Console.WriteLine("Choose action (press a key):");
-		Console.WriteLine(" I = install, enable, upgrade, repair, modify");
-		Console.WriteLine(" F = install files only, don't enable");
-		Console.WriteLine(" D = disable, restore the original boot loader");
-		Console.WriteLine(" R = remove completely; delete all HackBGRT files and images");
+		Console.WriteLine(" I = install");
+		Console.WriteLine("     - creates a new EFI boot entry for HackBGRT");
+		Console.WriteLine("     - sometimes needs to be enabled in firmware settings");
+		Console.WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
+		Console.WriteLine(" O = install (legacy)");
+		Console.WriteLine("     - overwrites the MS boot loader");
+		Console.WriteLine("     - may require re-install after Windows updates");
+		Console.WriteLine("     - could brick your system if configured incorrectly");
+		Console.WriteLine(" F = install files only");
+		Console.WriteLine("     - needs to be enabled somehow");
+		Console.WriteLine(" D = disable");
+		Console.WriteLine("     - removes created entries, restores MS boot loader");
+		Console.WriteLine(" R = remove completely");
+		Console.WriteLine("     - disables, then deletes all files and images");
 		Console.WriteLine(" C = cancel");
 
 		var k = Console.ReadKey().Key;
 		Console.WriteLine();
-		if (k == ConsoleKey.I || k == ConsoleKey.F) {
+		if (k == ConsoleKey.I || k == ConsoleKey.O || k == ConsoleKey.F) {
 			Configure();
 		}
 		if (k == ConsoleKey.I) {
+			RunPrivilegedActions(new string[] { "install", "enable-entry" });
+		} else if (k == ConsoleKey.O) {
 			RunPrivilegedActions(new string[] { "install", "enable-overwrite" });
 		} else if (k == ConsoleKey.F) {
 			RunPrivilegedActions(new string[] { "install" });
@@ -417,6 +448,11 @@ public class Setup: SetupHelper {
 				InstallFiles();
 			} else if (arg == "allow-secure-boot") {
 				allowSecureBoot = true;
+			} else if (arg == "enable-entry") {
+				HandleSecureBoot(allowSecureBoot);
+				EnableEntry();
+			} else if (arg == "disable-entry") {
+				DisableEntry();
 			} else if (arg == "enable-overwrite") {
 				HandleSecureBoot(allowSecureBoot);
 				OverwriteMsLoader();
@@ -424,6 +460,7 @@ public class Setup: SetupHelper {
 				RestoreMsLoader();
 			} else if (arg == "disable") {
 				RestoreMsLoader();
+				DisableEntry();
 			} else if (arg == "uninstall") {
 				Uninstall();
 			} else {
