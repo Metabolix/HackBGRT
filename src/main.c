@@ -393,14 +393,14 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 			}
 		}
 		Print(L"HackBGRT: Reverting to %s.\n", config.boot_path);
-		Print(L"Press escape to cancel, any other key to boot.\n");
-		if (ReadKey().ScanCode == SCAN_ESC) {
+		Print(L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
+		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			goto fail;
 		}
-	}
-	if (config.debug) {
-		Print(L"HackBGRT: Ready to boot.\nPress escape to cancel, any other key to boot.\n");
-		if (ReadKey().ScanCode == SCAN_ESC) {
+	} else if (config.debug) {
+		Print(L"HackBGRT: Ready to boot. Disable debug mode to skip this screen.\n");
+		Print(L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
+		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			return 0;
 		}
 	}
@@ -409,6 +409,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 	Print(L"HackBGRT: Started %s. Why are we still here?!\n", config.boot_path);
+	Print(L"Please check that %s is not actually HackBGRT!\n", config.boot_path);
 	goto fail;
 
 	fail: {
@@ -419,8 +420,8 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		#else
 			Print(L"HackBGRT version: unknown; not an official release?\n");
 		#endif
-		Print(L"Press any key to exit.\n");
-		ReadKey();
+		Print(L"Press any key (or wait 15 seconds) to exit.\n");
+		ReadKey(15000);
 		return 1;
 	}
 }

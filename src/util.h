@@ -82,15 +82,18 @@ extern void RandomSeedAuto(void);
 
 /**
  * Wait for a key press. It will still remain in the buffer.
+ *
+ * @param timeout_ms The timeout in milliseconds, or 0 for no timeout.
  */
-extern void WaitKey(void);
+extern EFI_STATUS WaitKey(UINT64 timeout_ms);
 
 /**
  * Wait for a key press and read it.
  *
+ * @param timeout_ms The timeout in milliseconds, or 0 for no timeout.
  * @return The pressed key.
  */
-extern EFI_INPUT_KEY ReadKey(void);
+extern EFI_INPUT_KEY ReadKey(UINT64 timeout_ms);
 
 /**
  * Load a file, allocate some extra bytes as well.
