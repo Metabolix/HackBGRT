@@ -86,13 +86,13 @@ static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum Ha
 }
 
 static int ParseCoordinate(const CHAR16* str, enum HackBGRT_action action) {
-	if (str && L'0' <= str[0] && str[0] <= L'9') {
-		return Atoi(str);
+	if (str && ((L'0' <= str[0] && str[0] <= L'9') || str[0] == L'-')) {
+		return str[0] == L'-' ? -(int)Atoi(str+1) : (int)Atoi(str);
 	}
-	if ((str && StrnCmp(str, L"native", 6) == 0) || action == HackBGRT_KEEP) {
-		return HackBGRT_coord_native;
+	if ((str && StrnCmp(str, L"keep", 4) == 0) || action == HackBGRT_KEEP) {
+		return HackBGRT_coord_keep;
 	}
-	return HackBGRT_coord_auto;
+	return 0;
 }
 
 static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) {

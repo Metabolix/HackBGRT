@@ -14,8 +14,7 @@ enum HackBGRT_action {
  * @see struct HackBGRT_config
  */
 enum HackBGRT_coordinate {
-	HackBGRT_coord_auto = 0x10000001,
-	HackBGRT_coord_native = 0x10000002
+	HackBGRT_coord_keep = -999999
 };
 
 /**
@@ -30,6 +29,8 @@ struct HackBGRT_config {
 	int image_weight_sum;
 	int resolution_x;
 	int resolution_y;
+	int old_resolution_x;
+	int old_resolution_y;
 	const CHAR16* boot_path;
 };
 

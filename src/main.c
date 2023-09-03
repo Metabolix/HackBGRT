@@ -43,12 +43,14 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP(void) {
 static void SetResolution(int w, int h) {
 	EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = GOP();
 	if (!gop) {
+		config.old_resolution_x = config.resolution_x = 0;
+		config.old_resolution_y = config.resolution_y = 0;
 		Debug(L"GOP not found!\n");
 		return;
 	}
 	UINTN best_i = gop->Mode->Mode;
-	int best_w = gop->Mode->Info->HorizontalResolution;
-	int best_h = gop->Mode->Info->VerticalResolution;
+	int best_w = config.old_resolution_x = gop->Mode->Info->HorizontalResolution;
+	int best_h = config.old_resolution_y = gop->Mode->Info->VerticalResolution;
 	w = (w <= 0 ? w < 0 ? best_w : 0x7fffffff : w);
 	h = (h <= 0 ? h < 0 ? best_h : 0x7fffffff : h);
 
@@ -86,27 +88,11 @@ static void SetResolution(int w, int h) {
 		best_i = i;
 	}
 	Debug(L"Found resolution %dx%d.\n", best_w, best_h);
+	config.resolution_x = best_w;
+	config.resolution_y = best_h;
 	if (best_i != gop->Mode->Mode) {
 		gop->SetMode(gop, best_i);
 	}
-}
-
-/**
- * Select the correct coordinate (manual, automatic, native)
- *
- * @param value The configured coordinate value; has special values for automatic and native.
- * @param automatic The automatically calculated alternative.
- * @param native The original coordinate.
- * @see enum HackBGRT_coordinate
- */
-static int SelectCoordinate(int value, int automatic, int native) {
-	if (value == HackBGRT_coord_auto) {
-		return automatic;
-	}
-	if (value == HackBGRT_coord_native) {
-		return native;
-	}
-	return value;
 }
 
 /**
@@ -259,14 +245,11 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 	// KEEP/REPLACE: first get the old BGRT entry.
 	ACPI_BGRT* bgrt = HandleAcpiTables(HackBGRT_KEEP, 0);
 
-	// Get the old BMP and position, if possible.
-	BMP* old_bmp = 0;
-	int old_x = 0, old_y = 0;
-	if (bgrt && VerifyAcpiSdtChecksum(bgrt)) {
-		old_bmp = (BMP*) (UINTN) bgrt->image_address;
-		old_x = bgrt->image_offset_x;
-		old_y = bgrt->image_offset_y;
-	}
+	// Get the old BMP and position (relative to screen center), if possible.
+	const int old_valid = bgrt && VerifyAcpiSdtChecksum(bgrt);
+	BMP* old_bmp = old_valid ? (BMP*) (UINTN) bgrt->image_address : 0;
+	const int old_x = old_bmp ? bgrt->image_offset_x + (old_bmp->width - config.old_resolution_x) / 2 : 0;
+	const int old_y = old_bmp ? bgrt->image_offset_y + (old_bmp->height - config.old_resolution_y) / 2 : 0;
 
 	// Missing BGRT?
 	if (!bgrt) {
@@ -303,20 +286,21 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 
 	bgrt->image_address = (UINTN) new_bmp;
 
-	// Calculate the automatically centered position for the image.
-	int auto_x = 0, auto_y = 0;
-	if (GOP()) {
-		auto_x = max(0, ((int)GOP()->Mode->Info->HorizontalResolution - (int)new_bmp->width) / 2);
-		auto_y = max(0, ((int)GOP()->Mode->Info->VerticalResolution * 2/3 - (int)new_bmp->height) / 2);
-	} else if (old_bmp) {
-		auto_x = max(0, old_x + ((int)old_bmp->width - (int)new_bmp->width) / 2);
-		auto_y = max(0, old_y + ((int)old_bmp->height - (int)new_bmp->height) / 2);
-	}
+	// New center coordinates.
+	const int new_x = config.image_x == HackBGRT_coord_keep ? old_x : config.image_x;
+	const int new_y = config.image_y == HackBGRT_coord_keep ? old_y : config.image_y;
 
-	// Set the position (manual, automatic, original).
-	bgrt->image_offset_x = SelectCoordinate(config.image_x, auto_x, old_x);
-	bgrt->image_offset_y = SelectCoordinate(config.image_y, auto_y, old_y);
-	Debug(L"HackBGRT: BMP at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
+	// Calculate absolute position.
+	const int max_x = config.resolution_x - new_bmp->width;
+	const int max_y = config.resolution_y - new_bmp->height;
+	bgrt->image_offset_x = max(0, min(max_x, new_x + (config.resolution_x - new_bmp->width) / 2));
+	bgrt->image_offset_y = max(0, min(max_y, new_y + (config.resolution_y - new_bmp->height) / 2));
+
+	Debug(
+		L"HackBGRT: BMP at (%d, %d), center (%d, %d), resolution (%d, %d).\n",
+		(int) bgrt->image_offset_x, (int) bgrt->image_offset_y,
+		new_x, new_y, config.resolution_x, config.resolution_y
+	);
 
 	// Store this BGRT in the ACPI tables.
 	SetAcpiSdtChecksum(bgrt);
