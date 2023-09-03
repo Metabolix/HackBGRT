@@ -14,7 +14,7 @@ enum HackBGRT_action {
  * @see struct HackBGRT_config
  */
 enum HackBGRT_coordinate {
-	HackBGRT_coord_keep = -999999
+	HackBGRT_coord_keep = -1000000001
 };
 
 /**
@@ -27,6 +27,7 @@ struct HackBGRT_config {
 	int image_x;
 	int image_y;
 	int image_weight_sum;
+	int orientation;
 	int resolution_x;
 	int resolution_y;
 	int old_resolution_x;

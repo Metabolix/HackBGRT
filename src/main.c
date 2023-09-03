@@ -248,8 +248,12 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 	// Get the old BMP and position (relative to screen center), if possible.
 	const int old_valid = bgrt && VerifyAcpiSdtChecksum(bgrt);
 	BMP* old_bmp = old_valid ? (BMP*) (UINTN) bgrt->image_address : 0;
-	const int old_x = old_bmp ? bgrt->image_offset_x + (old_bmp->width - config.old_resolution_x) / 2 : 0;
-	const int old_y = old_bmp ? bgrt->image_offset_y + (old_bmp->height - config.old_resolution_y) / 2 : 0;
+	const int old_orientation = old_valid ? ((bgrt->status >> 1) & 3) : 0;
+	const int old_swap = old_orientation & 1;
+	const int old_reso_x = old_swap ? config.old_resolution_y : config.old_resolution_x;
+	const int old_reso_y = old_swap ? config.old_resolution_x : config.old_resolution_y;
+	const int old_x = old_bmp ? bgrt->image_offset_x + (old_bmp->width - old_reso_x) / 2 : 0;
+	const int old_y = old_bmp ? bgrt->image_offset_y + (old_bmp->height - old_reso_y) / 2 : 0;
 
 	// Missing BGRT?
 	if (!bgrt) {
@@ -284,22 +288,29 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		return;
 	}
 
+	// Set the image address and orientation.
 	bgrt->image_address = (UINTN) new_bmp;
+	const int new_orientation = config.orientation == HackBGRT_coord_keep ? old_orientation : ((config.orientation / 90) & 3);
+	bgrt->status = new_orientation << 1;
 
 	// New center coordinates.
 	const int new_x = config.image_x == HackBGRT_coord_keep ? old_x : config.image_x;
 	const int new_y = config.image_y == HackBGRT_coord_keep ? old_y : config.image_y;
+	const int new_swap = new_orientation & 1;
+	const int new_reso_x = new_swap ? config.resolution_y : config.resolution_x;
+	const int new_reso_y = new_swap ? config.resolution_x : config.resolution_y;
 
 	// Calculate absolute position.
-	const int max_x = config.resolution_x - new_bmp->width;
-	const int max_y = config.resolution_y - new_bmp->height;
-	bgrt->image_offset_x = max(0, min(max_x, new_x + (config.resolution_x - new_bmp->width) / 2));
-	bgrt->image_offset_y = max(0, min(max_y, new_y + (config.resolution_y - new_bmp->height) / 2));
+	const int max_x = new_reso_x - new_bmp->width;
+	const int max_y = new_reso_y - new_bmp->height;
+	bgrt->image_offset_x = max(0, min(max_x, new_x + (new_reso_x - new_bmp->width) / 2));
+	bgrt->image_offset_y = max(0, min(max_y, new_y + (new_reso_y - new_bmp->height) / 2));
 
 	Debug(
-		L"HackBGRT: BMP at (%d, %d), center (%d, %d), resolution (%d, %d).\n",
+		L"HackBGRT: BMP at (%d, %d), center (%d, %d), resolution (%d, %d) with orientation %d applied.\n",
 		(int) bgrt->image_offset_x, (int) bgrt->image_offset_y,
-		new_x, new_y, config.resolution_x, config.resolution_y
+		new_x, new_y, new_reso_x, new_reso_y,
+		new_orientation * 90
 	);
 
 	// Store this BGRT in the ACPI tables.

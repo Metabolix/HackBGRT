@@ -11,6 +11,7 @@ boot=MS
 #  - "n=(number)", a weight for this image in the randomization process. Default: n=1.
 #  - "x=(number)" or "x=keep", the x offset from the center. Default: x=0.
 #  - "y=(number)" or "y=keep", the y offset from the center. Default: y=0.
+#  - "o=(0|90|180|270|keep)", the screen orientation, degrees anticlockwise. Default: o=keep.
 # One of the following:
 #  - "keep" to keep the firmware logo. Also keeps coordinates by default.
 #  - "remove" to remove the BGRT. Makes x and y meaningless.
@@ -23,14 +24,14 @@ boot=MS
 #  - image=remove
 #  - image=black
 #  - image= x=0 y=-200 path=\EFI\HackBGRT\topimage.bmp
-#  - image=n=1,path=\EFI\HackBGRT\splash.bmp
-#  - image=n=50,path=\EFI\HackBGRT\probable.bmp
+#  - image= n=1 o=90 path=\EFI\HackBGRT\sideways.bmp
+#  - image= n=50 y=999999 o=keep path=\EFI\HackBGRT\probable.bmp
 # The above examples together would produce
 #  - 1/54 chance for the default OS logo
 #  - 1/54 chance for black screen
 #  - 1/54 chance for topimage.bmp, 200 px above the center of the screen
-#  - 1/54 chance for splash.bmp, automatically positioned
-#  - 50/54 chance for probable.bmp, automatically positioned
+#  - 1/54 chance for splash.bmp, centered, orientation set to 90 degrees
+#  - 50/54 chance for probable.bmp, at the bottom edge, explicitly default orientation
 # Default: just one image.
 image= y=-200 path=\EFI\HackBGRT\splash.bmp
 
