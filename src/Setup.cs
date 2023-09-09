@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Security.Principal;
+using System.Text.RegularExpressions;
 
 /**
  * HackBGRT Setup.
@@ -56,6 +57,7 @@ public class Setup {
 		"allow-secure-boot",
 		"allow-bad-loader",
 		"enable-entry", "disable-entry",
+		"enable-bcdedit", "disable-bcdedit",
 		"enable-overwrite", "disable-overwrite",
 		"disable",
 		"uninstall",
@@ -327,6 +329,55 @@ public class Setup {
 	}
 
 	/**
+	 * Enable HackBGRT with bcdedit.
+	 */
+	protected void EnableBCDEdit() {
+		try {
+			var re = new Regex("[{][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[}]");
+			var guid = re.Match(Execute("bcdedit", "/copy {bootmgr} /d HackBGRT", true)).Value;
+			Execute("bcdedit", $"/set {guid} device partition={Esp.Location}", true);
+			Execute("bcdedit", $"/set {guid} path \\EFI\\HackBGRT\\loader.efi", true);
+			foreach (var arg in new string[] { "locale", "inherit", "default", "resumeobject", "displayorder", "toolsdisplayorder", "timeout" }) {
+				Execute("bcdedit", $"/deletevalue {guid} {arg}", true);
+			}
+			var fwbootmgr = "{fwbootmgr}";
+			Execute("bcdedit", $"/set {fwbootmgr} displayorder {guid} /addfirst", true);
+		} catch (Exception e) {
+			Log($"EnableBCDEdit failed: {e.ToString()}");
+			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
+		}
+	}
+
+	/**
+	 * Disable HackBGRT with bcdedit.
+	 */
+	protected void DisableBCDEdit() {
+		bool found = false, disabled = false;
+		var fullOutput = Execute("bcdedit", "/enum firmware", true);
+		if (fullOutput == null) {
+			return;
+		}
+		var re = new Regex("[{][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[}]");
+		var guids = (from Match match in re.Matches(fullOutput) select match.Value).Distinct().ToArray();
+		foreach (var guid in guids) {
+			var entry = Execute("bcdedit", $"/enum {guid}", true);
+			if (entry == null) {
+				Log($"DisableBCDEdit failed to enum {guid}.");
+			} else if (entry.IndexOf("HackBGRT") >= 0) {
+				found = true;
+				Log($"Disabling HackBGRT entry {guid}.");
+				if (Execute("bcdedit", $"/delete {guid}", true) == null) {
+					Log($"DisableBCDEdit failed to delete {guid}.");
+				}
+				disabled = true;
+			}
+		}
+		if (found && !disabled) {
+			throw new SetupException("Failed to disable HackBGRT with BCDEdit!");
+		}
+	}
+
+	/**
 	 * Enable HackBGRT boot entry.
 	 */
 	protected void EnableEntry() {
@@ -442,11 +493,20 @@ public class Setup {
 	}
 
 	/**
+	 * Disable HackBGRT completely.
+	 */
+	protected void Disable() {
+		RestoreMsLoader();
+		DisableBCDEdit();
+		DisableEntry();
+		WriteLine("HackBGRT has been disabled.");
+	}
+
+	/**
 	 * Uninstall HackBGRT completely.
 	 */
 	protected void Uninstall() {
-		RestoreMsLoader();
-		DisableEntry();
+		Disable();
 		try {
 			Directory.Delete(InstallPath, true);
 			WriteLine($"HackBGRT has been removed from {InstallPath}.");
@@ -571,6 +631,11 @@ public class Setup {
 		WriteLine("     - creates a new EFI boot entry for HackBGRT");
 		WriteLine("     - sometimes needs to be enabled in firmware settings");
 		WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
+		WriteLine(" J = install (alternative)");
+		WriteLine("     - creates a new EFI boot entry with an alternative method (BCDEdit)");
+		WriteLine("     - always sets HackBGRT as the first boot option");
+		WriteLine("     - sometimes shows up as \"Windows Boot Manager\"");
+		WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
 		WriteLine(" O = install (legacy)");
 		WriteLine("     - overwrites the MS boot loader");
 		WriteLine("     - may require re-install after Windows updates");
@@ -591,6 +656,8 @@ public class Setup {
 		}
 		if (k == ConsoleKey.I) {
 			RunPrivilegedActions(new string[] { "install", "enable-entry" });
+		} else if (k == ConsoleKey.J) {
+			RunPrivilegedActions(new string[] { "install", "enable-bcdedit" });
 		} else if (k == ConsoleKey.O) {
 			RunPrivilegedActions(new string[] { "install", "enable-overwrite" });
 		} else if (k == ConsoleKey.F) {
@@ -661,6 +728,12 @@ public class Setup {
 				verify(() => DisableEntry());
 			} else if (arg == "disable-entry") {
 				DisableEntry();
+			} else if (arg == "enable-bcdedit") {
+				HandleSecureBoot(allowSecureBoot);
+				EnableBCDEdit();
+				verify(() => DisableBCDEdit());
+			} else if (arg == "disable-bcdedit") {
+				DisableBCDEdit();
 			} else if (arg == "enable-overwrite") {
 				HandleSecureBoot(allowSecureBoot);
 				OverwriteMsLoader();
@@ -668,8 +741,7 @@ public class Setup {
 			} else if (arg == "disable-overwrite") {
 				RestoreMsLoader();
 			} else if (arg == "disable") {
-				RestoreMsLoader();
-				DisableEntry();
+				Disable();
 			} else if (arg == "uninstall") {
 				Uninstall();
 			} else {

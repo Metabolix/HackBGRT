@@ -30,6 +30,8 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 	* `install` – copy the files but don't enable.
 	* `enable-entry` – create a new EFI boot entry.
 	* `disable-entry` – disable the EFI boot entry.
+	* `enable-bcdedit` – use `bcdedit` to create a new EFI boot entry.
+	* `disable-bootmgr` – use `bcdedit` to disable the EFI boot entry.
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
 	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
