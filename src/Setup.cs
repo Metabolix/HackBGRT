@@ -61,6 +61,7 @@ public class Setup {
 		"enable-overwrite", "disable-overwrite",
 		"disable",
 		"uninstall",
+		"boot-to-fw",
 	};
 
 	/** @var The target directory. */
@@ -540,10 +541,7 @@ public class Setup {
 				throw new SetupException("Aborting because of Secure Boot.");
 			}
 			WriteLine("Choose action (press a key):");
-			bool canBootToFW = Efi.CanBootToFW();
-			if (canBootToFW) {
-				WriteLine(" S = Enter EFI Setup to disable Secure Boot manually; requires reboot!");
-			}
+			WriteLine(" S = Enter EFI Setup to disable Secure Boot manually; requires reboot!");
 			WriteLine(" I = Install anyway; THIS MAY BE DANGEROUS!");
 			WriteLine(" C = Cancel");
 			var k = Console.ReadKey().Key;
@@ -551,23 +549,29 @@ public class Setup {
 			WriteLine();
 			if (k == ConsoleKey.I) {
 				WriteLine("Continuing. THIS MAY BE DANGEROUS!");
-			} else if (canBootToFW && k == ConsoleKey.S) {
-				Efi.SetBootToFW();
-				WriteLine();
-				WriteLine("Reboot your computer. You will then automatically enter the UEFI setup.");
-				WriteLine("Find and disable Secure Boot, then save and exit, then run this installer.");
-				WriteLine("Press R to reboot now, other key to exit.");
-				var k2 = Console.ReadKey().Key;
-				Log($"User input: {k2}");
-				WriteLine();
-				if (k2 == ConsoleKey.R) {
-					WriteLine("Rebooting now...");
-					StartProcess("shutdown", "-f -r -t 1");
-				}
-				throw new ExitSetup(0);
+			} else if (k == ConsoleKey.S) {
+				BootToFW();
 			} else {
 				throw new SetupException("Aborting because of Secure Boot.");
 			}
+		}
+	}
+
+	/**
+	 * Boot to the UEFI setup.
+	 */
+	protected void BootToFW() {
+		if (!Efi.CanBootToFW()) {
+			throw new SetupException("On this computer, you will need to find the UEFI setup manually.");
+		}
+		WriteLine("Notice: if this fails, you can still enter the UEFI setup manually.");
+		try {
+			Efi.SetBootToFW();
+			WriteLine("Rebooting now...");
+			StartProcess("shutdown", "-f -r -t 1");
+		} catch (Exception e) {
+			Log($"BootToFW failed: {e.ToString()}");
+			throw new SetupException("Failed to reboot to UEFI setup! Do it manually.");
 		}
 	}
 
@@ -646,6 +650,9 @@ public class Setup {
 		WriteLine("     - removes created entries, restores MS boot loader");
 		WriteLine(" R = remove completely");
 		WriteLine("     - disables, then deletes all files and images");
+		WriteLine(" B = boot to UEFI setup");
+		WriteLine("     - lets you disable Secure Boot");
+		WriteLine("     - lets you move HackBGRT before Windows in boot order");
 		WriteLine(" C = cancel");
 
 		var k = Console.ReadKey().Key;
@@ -666,6 +673,8 @@ public class Setup {
 			RunPrivilegedActions(new string[] { "disable" });
 		} else if (k == ConsoleKey.R) {
 			RunPrivilegedActions(new string[] { "uninstall" });
+		} else if (k == ConsoleKey.B) {
+			RunPrivilegedActions(new string[] { "boot-to-fw" });
 		} else if (k == ConsoleKey.C) {
 			throw new ExitSetup(1);
 		} else {
@@ -744,6 +753,8 @@ public class Setup {
 				Disable();
 			} else if (arg == "uninstall") {
 				Uninstall();
+			} else if (arg == "boot-to-fw") {
+				BootToFW();
 			} else {
 				throw new SetupException($"Invalid action: '{arg}'!");
 			}
