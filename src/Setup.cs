@@ -9,6 +9,10 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
+
+[assembly: AssemblyInformationalVersionAttribute(GIT_DESCRIBE.data)]
+[assembly: AssemblyProductAttribute("HackBGRT")]
 
 /**
  * HackBGRT Setup.
