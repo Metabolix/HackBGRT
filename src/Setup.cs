@@ -59,6 +59,7 @@ public class Setup {
 	protected static readonly string[] privilegedActions = new string[] {
 		"install",
 		"allow-secure-boot",
+		"allow-bitlocker",
 		"allow-bad-loader",
 		"enable-entry", "disable-entry",
 		"enable-bcdedit", "disable-bcdedit",
@@ -562,6 +563,50 @@ public class Setup {
 	}
 
 	/**
+	 * Check BitLocker status and inform the user.
+	 *
+	 * @param allowBitLocker Allow BitLocker to be enabled?
+	 */
+	protected void HandleBitLocker(bool allowBitLocker) {
+		var output = Execute("manage-bde", "-status", true);
+		if (output == null) {
+			WriteLine("BitLocker status could not be determined.");
+			return;
+		}
+		var reOn = new Regex(@"Conversion Status:\s*(Encr|Fully Encr)|Protection Status:\s*Protection On");
+		var reOff = new Regex(@"Conversion Status:\s*(Fully Decrypted)|Protection Status:\s*Protection Off");
+		var isOn = reOn.Match(output).Success;
+		var isOff = reOff.Match(output).Success;
+		if (!isOn && isOff) {
+			WriteLine("BitLocker is disabled, good!");
+			return;
+		}
+		if (isOn) {
+			WriteLine("BitLocker is enabled. Make sure you have your recovery key!");
+		} else {
+			WriteLine("BitLocker status is unclear. Run manage-bde -status to check.");
+		}
+		if (Batch) {
+			if (allowBitLocker) {
+				return;
+			}
+			throw new SetupException("Aborting because of BitLocker.");
+		}
+		WriteLine("Choose action (press a key):");
+		WriteLine(" I = Install anyway; THIS MAY BE DANGEROUS!");
+		WriteLine(" C = Cancel");
+		var k = Console.ReadKey().Key;
+		Log($"User input: {k}");
+		WriteLine();
+		if (k == ConsoleKey.I) {
+			WriteLine("Continuing. THIS MAY BE DANGEROUS!");
+		} else {
+			WriteLine("If you absolutely want HackBGRT, you can disable BitLocker.");
+			throw new SetupException("Aborting because of BitLocker.");
+		}
+	}
+
+	/**
 	 * Boot to the UEFI setup.
 	 */
 	protected void BootToFW() {
@@ -712,7 +757,9 @@ public class Setup {
 
 		InitEspPath();
 		InitEspInfo();
-		bool allowSecureBoot = false, allowBadLoader = false;
+		bool allowSecureBoot = false;
+		bool allowBitLocker = false;
+		bool allowBadLoader = false;
 		Action<Action> verify = (Action revert) => {
 			try {
 				VerifyLoaderConfig();
@@ -727,30 +774,32 @@ public class Setup {
 				}
 			}
 		};
+		Action<Action, Action> enable = (Action enable, Action revert) => {
+			HandleSecureBoot(allowSecureBoot);
+			HandleBitLocker(allowBitLocker);
+			enable();
+			verify(revert);
+		};
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
 			if (arg == "install") {
 				InstallFiles();
 			} else if (arg == "allow-secure-boot") {
 				allowSecureBoot = true;
+			} else if (arg == "allow-bitlocker") {
+				allowBitLocker = true;
 			} else if (arg == "allow-bad-loader") {
 				allowBadLoader = true;
 			} else if (arg == "enable-entry") {
-				HandleSecureBoot(allowSecureBoot);
-				EnableEntry();
-				verify(() => DisableEntry());
+				enable(() => EnableEntry(), () => DisableEntry());
 			} else if (arg == "disable-entry") {
 				DisableEntry();
 			} else if (arg == "enable-bcdedit") {
-				HandleSecureBoot(allowSecureBoot);
-				EnableBCDEdit();
-				verify(() => DisableBCDEdit());
+				enable(() => EnableBCDEdit(), () => DisableBCDEdit());
 			} else if (arg == "disable-bcdedit") {
 				DisableBCDEdit();
 			} else if (arg == "enable-overwrite") {
-				HandleSecureBoot(allowSecureBoot);
-				OverwriteMsLoader();
-				verify(() => RestoreMsLoader());
+				enable(() => OverwriteMsLoader(), () => RestoreMsLoader());
 			} else if (arg == "disable-overwrite") {
 				RestoreMsLoader();
 			} else if (arg == "disable") {

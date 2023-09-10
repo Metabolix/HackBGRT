@@ -12,6 +12,7 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 
 * Make sure that your computer is booting with UEFI.
 * Make sure that Secure Boot is disabled, unless you know how to sign EFI applications.
+* Make sure that BitLocker is disabled, or find your recovery key.
 
 ### Windows installation
 
@@ -35,6 +36,7 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
 	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
+	* `allow-bitlocker` – ignore BitLocker in subsequent commands.
 	* `allow-bad-loader` – ignore bad boot loader configuration in subsequent commands.
 	* `disable` – run all relevant `disable-*` commands.
 	* `uninstall` – disable and remove completely.
