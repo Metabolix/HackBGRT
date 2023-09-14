@@ -51,8 +51,8 @@ static void SetResolution(int w, int h) {
 	UINTN best_i = gop->Mode->Mode;
 	int best_w = config.old_resolution_x = gop->Mode->Info->HorizontalResolution;
 	int best_h = config.old_resolution_y = gop->Mode->Info->VerticalResolution;
-	w = (w <= 0 ? w < 0 ? best_w : 0x7fffffff : w);
-	h = (h <= 0 ? h < 0 ? best_h : 0x7fffffff : h);
+	w = (w <= 0 ? w < 0 ? best_w : 999999 : w);
+	h = (h <= 0 ? h < 0 ? best_h : 999999 : h);
 
 	Debug(L"Looking for resolution %dx%d...\n", w, h);
 	for (UINT32 i = gop->Mode->MaxMode; i--;) {
