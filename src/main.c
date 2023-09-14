@@ -195,6 +195,44 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 }
 
 /**
+ * Generate a BMP with the given size and color.
+ *
+ * @param w The width.
+ * @param h The height.
+ * @param r The red component.
+ * @param g The green component.
+ * @param b The blue component.
+ * @return The generated BMP, or 0 on failure.
+ */
+static BMP* MakeBMP(int w, int h, UINT8 r, UINT8 g, UINT8 b) {
+	BMP* bmp = 0;
+	BS->AllocatePool(EfiBootServicesData, 54 + w * h * 4, (void**) &bmp);
+	if (!bmp) {
+		Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
+		BS->Stall(1000000);
+		return 0;
+	}
+	*bmp = (BMP) {
+		.magic_BM = { 'B', 'M' },
+		.file_size = 54 + w * h * 4,
+		.pixel_data_offset = 54,
+		.dib_header_size = 40,
+		.width = w,
+		.height = h,
+		.planes = 1,
+		.bpp = 32,
+	};
+	UINT8* data = (UINT8*) bmp + bmp->pixel_data_offset;
+	for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
+		*data++ = b;
+		*data++ = g;
+		*data++ = r;
+		*data++ = 0;
+	}
+	return bmp;
+}
+
+/**
  * Load a bitmap or generate a black one.
  *
  * @param root_dir The root directory for loading a BMP.
@@ -202,32 +240,22 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
  * @return The loaded BMP, or 0 if not available.
  */
 static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
-	BMP* bmp = 0;
 	if (!path) {
-		BS->AllocatePool(EfiBootServicesData, 58, (void**) &bmp);
-		if (!bmp) {
-			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
-			BS->Stall(1000000);
-			return 0;
-		}
-		CopyMem(
-			bmp,
-			"\x42\x4d\x3a\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00\x28\x00"
-			"\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x18\x00\x00\x00"
-			"\x00\x00\x04\x00\x00\x00\x13\x0b\x00\x00\x13\x0b\x00\x00\x00\x00"
-			"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-			58
-		);
-		return bmp;
+		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
 	Debug(L"HackBGRT: Loading %s.\n", path);
-	bmp = LoadFile(root_dir, path, 0);
-	if (!bmp) {
+	UINTN size = 0;
+	BMP* bmp = LoadFile(root_dir, path, &size);
+	if (bmp) {
+		if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
+			return bmp;
+		}
+		Print(L"HackBGRT: Invalid BMP (%s)!\n", path);
+	} else {
 		Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
-		BS->Stall(1000000);
-		return 0;
 	}
-	return bmp;
+	BS->Stall(1000000);
+	return MakeBMP(16, 16, 255, 0, 0); // error = red image
 }
 
 /**
