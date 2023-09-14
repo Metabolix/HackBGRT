@@ -259,6 +259,34 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 }
 
 /**
+ * Crop a BMP to the given size.
+ *
+ * @param bmp The BMP to crop.
+ * @param w The maximum width.
+ * @param h The maximum height.
+ */
+static void CropBMP(BMP* bmp, int w, int h) {
+	const int old_pitch = -(-(bmp->width * (bmp->bpp / 8)) & ~3);
+	bmp->image_size = 0;
+	bmp->width = min(bmp->width, w);
+	bmp->height = min(bmp->height, h);
+	const int h_max = (bmp->file_size - bmp->pixel_data_offset) / old_pitch;
+	bmp->height = min(bmp->height, h_max);
+	const int new_pitch = -(-(bmp->width * (bmp->bpp / 8)) & ~3);
+
+	if (new_pitch < old_pitch) {
+		for (int i = 1; i < bmp->height; ++i) {
+			CopyMem(
+				(UINT8*) bmp + bmp->pixel_data_offset + i * new_pitch,
+				(UINT8*) bmp + bmp->pixel_data_offset + i * old_pitch,
+				new_pitch
+			);
+		}
+	}
+	bmp->file_size = bmp->pixel_data_offset + bmp->height * new_pitch;
+}
+
+/**
  * The main logic for BGRT modification.
  *
  * @param root_dir The root directory for loading a BMP.
@@ -315,6 +343,9 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		HandleAcpiTables(HackBGRT_REMOVE, 0);
 		return;
 	}
+
+	// Crop the image to screen.
+	CropBMP(new_bmp, config.resolution_x, config.resolution_y);
 
 	// Set the image address and orientation.
 	bgrt->image_address = (UINTN) new_bmp;
