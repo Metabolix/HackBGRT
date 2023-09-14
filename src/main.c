@@ -325,12 +325,19 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		}
 	}
 
-	// Clear the BGRT.
-	const char data[0x38] =
-		"BGRT" "\x38\x00\x00\x00" "\x00" "\xd6" "Mtblx*" "HackBGRT"
-		"\x20\x17\x00\x00" "PTL " "\x02\x00\x00\x00"
-		"\x01\x00" "\x00" "\x00";
-	CopyMem(bgrt, data, sizeof(data));
+	*bgrt = (ACPI_BGRT) {
+		.header = {
+			.signature = "BGRT",
+			.length = sizeof(*bgrt),
+			.revision = 1,
+			.oem_id = "Mtblx*",
+			.oem_table_id = "HackBGRT",
+			.oem_revision = 1,
+			.asl_compiler_id = *(const UINT32*) "None",
+			.asl_compiler_revision = 1,
+		},
+		.version = 1,
+	};
 
 	// Get the image (either old or new).
 	BMP* new_bmp = old_bmp;
