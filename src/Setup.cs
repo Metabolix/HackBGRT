@@ -757,6 +757,7 @@ public class Setup {
 
 		InitEspPath();
 		InitEspInfo();
+		Efi.LogBGRT();
 		bool allowSecureBoot = false;
 		bool allowBitLocker = false;
 		bool allowBadLoader = false;

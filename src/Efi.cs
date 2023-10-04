@@ -31,6 +31,9 @@ public class Efi {
 	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern bool CloseHandle(IntPtr hObject);
 
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern UInt32 GetSystemFirmwareTable(UInt32 provider, UInt32 table, [MarshalAs(UnmanagedType.LPArray)] byte[] buffer, UInt32 len);
+
 	[StructLayout(LayoutKind.Sequential, Pack = 1)]
 	private struct TokPriv1Luid {
 		public int Count;
@@ -439,6 +442,28 @@ public class Efi {
 			bootOrderInts.Insert(msPos < 0 ? 0 : msPos, ownNum);
 			bootOrder.Data = bootOrderInts.SelectMany(num => new byte[] { (byte)(num & 0xff), (byte)(num >> 8) }).ToArray();
 			SetVariable(bootOrder, dryRun);
+		}
+	}
+
+	/**
+	 * Log the BGRT table (for debugging).
+	 */
+	public static void LogBGRT() {
+		try {
+			const UInt32 acpiBE = 0x41435049, bgrtLE = 0x54524742;
+			UInt32 size = GetSystemFirmwareTable(acpiBE, bgrtLE, null, 0);
+			byte[] buf = new byte[size];
+			var ret = GetSystemFirmwareTable(acpiBE, bgrtLE, buf, size);
+			if (ret == size) {
+				var hex = BitConverter.ToString(buf).Replace("-", " ");
+				Setup.Log($"LogBGRT: {hex}");
+			} else if (ret == 0) {
+				Setup.Log($"LogBGRT: Win32Error {Marshal.GetLastWin32Error()}");
+			} else {
+				Setup.Log($"LogBGRT: Size problems: spec {0x38}, buf {size}, ret {ret}");
+			}
+		} catch (Exception e) {
+			Setup.Log($"LogBGRT: {e}");
 		}
 	}
 }
