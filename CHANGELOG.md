@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.1.0 - 2023-10-04
+
+### Added
+- Check image size, crop if it's bigger than the screen.
+- Check BitLocker status to avoid unbootable machine.
+
 ## 2.0.0 - 2023-09-10
 
 ### Added
