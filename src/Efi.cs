@@ -456,14 +456,14 @@ public class Efi {
 			var ret = GetSystemFirmwareTable(acpiBE, bgrtLE, buf, size);
 			if (ret == size) {
 				var hex = BitConverter.ToString(buf).Replace("-", " ");
-				Setup.Log($"LogBGRT: {hex}");
+				Setup.Log($"LogBGRT: {size} bytes: {hex}");
 			} else if (ret == 0) {
 				Setup.Log($"LogBGRT: Win32Error {Marshal.GetLastWin32Error()}");
 			} else {
 				Setup.Log($"LogBGRT: Size problems: spec {0x38}, buf {size}, ret {ret}");
 			}
 		} catch (Exception e) {
-			Setup.Log($"LogBGRT: {e}");
+			Setup.Log($"LogBGRT failed: {e}");
 		}
 	}
 }
