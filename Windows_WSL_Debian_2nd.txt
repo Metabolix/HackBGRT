@@ -7,7 +7,7 @@ git clone https://github.com/FREEWING-JP/HackBGRT/ -b feature/mod_multi HackBGRT
 cd HackBGRT_MULTI
 
 # Download gnu-efi
-wget https://jaist.dl.sourceforge.net/project/gnu-efi/gnu-efi-3.0.12.tar.bz2
+wget --no-check-certificate https://jaist.dl.sourceforge.net/project/gnu-efi/gnu-efi-3.0.12.tar.bz2
 tar xvf gnu-efi-3.0.12.tar.bz2
 
 # Patch Install directory
