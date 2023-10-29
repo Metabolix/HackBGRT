@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.1.0 - 2023-10-04
+
+### Added
+- Check image size, crop if it's bigger than the screen.
+- Check BitLocker status to avoid unbootable machine.
+
+## 2.0.0 - 2023-09-10
+
+### Added
+- Log to `setup.log`.
+- Image conversion (GIF, EXIF, JPG, PNG, TIFF) to BMP during setup.
+- Quiet (batch) setup.
+- Dry run in setup.
+- EFI boot entry support in setup.
+- Orientation parameter (o=0|90|180|270) for images.
+
+### Changed
+- Configure (edit config and images) before installing.
+- Escalate privileges only when needed (after the menu).
+- Try to detect and avoid some configuration errors.
+- Wait at most 15 seconds for key presses during boot.
+- Image coordinates are now relative to the center.
+
 ## 1.5.1 - 2018-08-11
 
 ### Fixed

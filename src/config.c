@@ -70,35 +70,37 @@ BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir,
 	return TRUE;
 }
 
-static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum HackBGRT_action action, int x, int y, const CHAR16* path) {
+static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum HackBGRT_action action, int x, int y, int o, const CHAR16* path) {
 	config->image_weight_sum += weight;
 	UINT32 random = Random();
 	UINT32 limit = 0xfffffffful / config->image_weight_sum * weight;
 	if (config->debug) {
-		Print(L"HackBGRT: weight %d, action %d, x %d, y %d, path %s, random = %08x, limit = %08x\n", weight, action, x, y, path, random, limit);
+		Print(L"HackBGRT: weight %d, action %d, x %d, y %d, o %d, path %s, random = %08x, limit = %08x\n", weight, action, x, y, o, path, random, limit);
 	}
 	if (!config->image_weight_sum || random <= limit) {
 		config->action = action;
 		config->image_path = path;
+		config->orientation = o;
 		config->image_x = x;
 		config->image_y = y;
 	}
 }
 
 static int ParseCoordinate(const CHAR16* str, enum HackBGRT_action action) {
-	if (str && L'0' <= str[0] && str[0] <= L'9') {
-		return Atoi(str);
+	if (str && ((L'0' <= str[0] && str[0] <= L'9') || str[0] == L'-')) {
+		return str[0] == L'-' ? -(int)Atoi(str+1) : (int)Atoi(str);
 	}
-	if ((str && StrnCmp(str, L"native", 6) == 0) || action == HackBGRT_KEEP) {
-		return HackBGRT_coord_native;
+	if ((str && StrnCmp(str, L"keep", 4) == 0) || action == HackBGRT_KEEP) {
+		return HackBGRT_coord_keep;
 	}
-	return HackBGRT_coord_auto;
+	return 0;
 }
 
 static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) {
 	const CHAR16* n = StrStrAfter(line, L"n=");
 	const CHAR16* x = StrStrAfter(line, L"x=");
 	const CHAR16* y = StrStrAfter(line, L"y=");
+	const CHAR16* o = StrStrAfter(line, L"o=");
 	const CHAR16* f = StrStrAfter(line, L"path=");
 	enum HackBGRT_action action = HackBGRT_KEEP;
 	if (f) {
@@ -114,7 +116,10 @@ static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) 
 		return;
 	}
 	int weight = n && (!f || n < f) ? Atoi(n) : 1;
-	SetBMPWithRandom(config, weight, action, ParseCoordinate(x, action), ParseCoordinate(y, action), f);
+	int x_val = ParseCoordinate(x, action);
+	int y_val = ParseCoordinate(y, action);
+	int o_val = o ? ParseCoordinate(o, action) : HackBGRT_coord_keep;
+	SetBMPWithRandom(config, weight, action, x_val, y_val, o_val, f);
 }
 
 static void ReadConfigResolution(struct HackBGRT_config* config, const CHAR16* line) {
