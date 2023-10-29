@@ -1014,6 +1014,7 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 			if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
 				// return bmp;
 			} else {
+				FreePool(bmp);
 				Print(L"HackBGRT: Invalid BMP (%s)!\n", path);
 				bmp = 0;
 			}
