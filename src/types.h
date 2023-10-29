@@ -52,21 +52,12 @@ typedef struct {
 	UINT32 height;
 	UINT16 planes;
 	UINT16 bpp;
-<<<<<<< HEAD
-	UINT32 biCompression;
-	UINT32 biSizeImage;
-	UINT32 biXPelsPerMeter;
-	UINT32 biYPelsPerMeter;
-	UINT32 biClrUsed;
-	UINT32 biClrImportant;
-=======
 	UINT32 compression;
 	UINT32 image_size;
 	UINT32 x_pixels_per_meter;
 	UINT32 y_pixels_per_meter;
 	UINT32 colors_used;
 	UINT32 important_colors;
->>>>>>> master
 } BMP;
 
 /**
