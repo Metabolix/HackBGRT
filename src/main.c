@@ -195,7 +195,6 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 }
 
 /**
-<<<<<<< HEAD
  * Plot Dot pixel
  */
 static void plot_dot(const uint32_t x, const uint32_t y, const UINT8 r, const UINT8 g, const UINT8 b)
@@ -276,7 +275,7 @@ static void* init_bmp(uint32_t w, uint32_t h)
 	bmp->file_size = DWORD_TO_BYTES_LE(size);
 	bmp->width  = DWORD_TO_BYTES_LE(w);
 	bmp->height = DWORD_TO_BYTES_LE(h);
-	bmp->biSizeImage = DWORD_TO_BYTES_LE(size - 54);
+	bmp->image_size = DWORD_TO_BYTES_LE(size - 54);
 
 	return bmp;
 }
@@ -953,7 +952,7 @@ static BMP* LoadJPEG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
     return bmp;
 }
 
-=======
+/**
  * Generate a BMP with the given size and color.
  *
  * @param w The width.
@@ -991,7 +990,6 @@ static BMP* MakeBMP(int w, int h, UINT8 r, UINT8 g, UINT8 b) {
 	return bmp;
 }
 
->>>>>>> master
 /**
  * Load a bitmap or generate a black one.
  *
@@ -1001,29 +999,27 @@ static BMP* MakeBMP(int w, int h, UINT8 r, UINT8 g, UINT8 b) {
  */
 static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	if (!path) {
-<<<<<<< HEAD
-		bmp = init_bmp(1, 1);
-		if (!bmp) {
-			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
-			BS->Stall(1000000);
-			return 0;
-		}
-		// Black dot
-		CopyMem(
-			((UINT8*)bmp)+54,
-			"\x00\x00\x00\x00",
-			4
-		);
-		return bmp;
+		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
 	Debug(L"HackBGRT: Loading %s.\n", path);
-
+	BMP* bmp = 0;
 	UINTN len = StrLen(path);
 	CHAR16 last_char_2 = path[len - 2];
 	Debug(L"HackBGRT: Filename Len %d, Last Char %c.\n", (int)len, last_char_2);
 	if (last_char_2 == 'm' || last_char_2 == 'M') {
 		// xxx.BMP
-		bmp = LoadFile(root_dir, path, 0);
+		UINTN size = 0;
+		bmp = LoadFile(root_dir, path, &size);
+		if (bmp) {
+			if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
+				// return bmp;
+			} else {
+				Print(L"HackBGRT: Invalid BMP (%s)!\n", path);
+				bmp = 0;
+			}
+		} else {
+			Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
+		}
 	} else if (last_char_2 == 'n' || last_char_2 == 'N') {
 		// xxx.PNG
 		bmp = LoadPNG(root_dir, path);
@@ -1032,28 +1028,13 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 		// xxx.JPEG
 		bmp = LoadJPEG(root_dir, path);
 	}
-	if (!bmp) {
-=======
-		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
-	}
-	Debug(L"HackBGRT: Loading %s.\n", path);
-	UINTN size = 0;
-	BMP* bmp = LoadFile(root_dir, path, &size);
 	if (bmp) {
-		if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
-			return bmp;
-		}
-		Print(L"HackBGRT: Invalid BMP (%s)!\n", path);
-	} else {
->>>>>>> master
-		Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
+		Debug(L"HackBGRT: Load Success %s.\n", path);
+
+		return bmp;
 	}
-<<<<<<< HEAD
 
-	Debug(L"HackBGRT: Load Success %s.\n", path);
-
-	return bmp;
-=======
+	Print(L"HackBGRT: Failed to load IMAGE (%s)!\n", path);
 	BS->Stall(1000000);
 	return MakeBMP(16, 16, 255, 0, 0); // error = red image
 }
@@ -1084,7 +1065,6 @@ static void CropBMP(BMP* bmp, int w, int h) {
 		}
 	}
 	bmp->file_size = bmp->pixel_data_offset + bmp->height * new_pitch;
->>>>>>> master
 }
 
 /**
