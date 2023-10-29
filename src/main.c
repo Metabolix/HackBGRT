@@ -43,14 +43,16 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP(void) {
 static void SetResolution(int w, int h) {
 	EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = GOP();
 	if (!gop) {
+		config.old_resolution_x = config.resolution_x = 0;
+		config.old_resolution_y = config.resolution_y = 0;
 		Debug(L"GOP not found!\n");
 		return;
 	}
 	UINTN best_i = gop->Mode->Mode;
-	int best_w = gop->Mode->Info->HorizontalResolution;
-	int best_h = gop->Mode->Info->VerticalResolution;
-	w = (w <= 0 ? w < 0 ? best_w : 0x7fffffff : w);
-	h = (h <= 0 ? h < 0 ? best_h : 0x7fffffff : h);
+	int best_w = config.old_resolution_x = gop->Mode->Info->HorizontalResolution;
+	int best_h = config.old_resolution_y = gop->Mode->Info->VerticalResolution;
+	w = (w <= 0 ? w < 0 ? best_w : 999999 : w);
+	h = (h <= 0 ? h < 0 ? best_h : 999999 : h);
 
 	Debug(L"Looking for resolution %dx%d...\n", w, h);
 	for (UINT32 i = gop->Mode->MaxMode; i--;) {
@@ -86,27 +88,11 @@ static void SetResolution(int w, int h) {
 		best_i = i;
 	}
 	Debug(L"Found resolution %dx%d.\n", best_w, best_h);
+	config.resolution_x = best_w;
+	config.resolution_y = best_h;
 	if (best_i != gop->Mode->Mode) {
 		gop->SetMode(gop, best_i);
 	}
-}
-
-/**
- * Select the correct coordinate (manual, automatic, native)
- *
- * @param value The configured coordinate value; has special values for automatic and native.
- * @param automatic The automatically calculated alternative.
- * @param native The original coordinate.
- * @see enum HackBGRT_coordinate
- */
-static int SelectCoordinate(int value, int automatic, int native) {
-	if (value == HackBGRT_coord_auto) {
-		return automatic;
-	}
-	if (value == HackBGRT_coord_native) {
-		return native;
-	}
-	return value;
 }
 
 /**
@@ -153,7 +139,7 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 		if (CompareMem(rsdp->signature, "RSD PTR ", 8) != 0 || rsdp->revision < 2 || !VerifyAcpiRsdp2Checksums(rsdp)) {
 			continue;
 		}
-		Debug(L"RSDP: revision = %d, OEM ID = %s\n", rsdp->revision, TmpStr(rsdp->oem_id, 6));
+		Debug(L"RSDP @%x: revision = %d, OEM ID = %s\n", (UINTN)rsdp, rsdp->revision, TmpStr(rsdp->oem_id, 6));
 
 		ACPI_SDT_HEADER* xsdt = (ACPI_SDT_HEADER *) (UINTN) rsdp->xsdt_address;
 		if (!xsdt || CompareMem(xsdt->signature, "XSDT", 4) != 0 || !VerifyAcpiSdtChecksum(xsdt)) {
@@ -163,7 +149,7 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 		UINT64* entry_arr = (UINT64*)&xsdt[1];
 		UINT32 entry_arr_length = (xsdt->length - sizeof(*xsdt)) / sizeof(UINT64);
 
-		Debug(L"* XSDT: OEM ID = %s, entry count = %d\n", TmpStr(xsdt->oem_id, 6), entry_arr_length);
+		Debug(L"* XSDT @%x: OEM ID = %s, entry count = %d\n", (UINTN)xsdt, TmpStr(xsdt->oem_id, 6), entry_arr_length);
 
 		int bgrt_count = 0;
 		for (int j = 0; j < entry_arr_length; j++) {
@@ -171,7 +157,7 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 			if (CompareMem(entry->signature, "BGRT", 4) != 0) {
 				continue;
 			}
-			Debug(L" - ACPI table: %s, revision = %d, OEM ID = %s\n", TmpStr(entry->signature, 4), entry->revision, TmpStr(entry->oem_id, 6));
+			Debug(L" - ACPI table @%x: %s, revision = %d, OEM ID = %s\n", (UINTN)entry, TmpStr(entry->signature, 4), entry->revision, TmpStr(entry->oem_id, 6));
 			switch (action) {
 				case HackBGRT_KEEP:
 					if (!bgrt) {
@@ -289,7 +275,7 @@ static void* init_bmp(uint32_t w, uint32_t h)
 	bmp->file_size = DWORD_TO_BYTES_LE(size);
 	bmp->width  = DWORD_TO_BYTES_LE(w);
 	bmp->height = DWORD_TO_BYTES_LE(h);
-	bmp->biSizeImage = DWORD_TO_BYTES_LE(size - 54);
+	bmp->image_size = DWORD_TO_BYTES_LE(size - 54);
 
 	return bmp;
 }
@@ -967,6 +953,44 @@ static BMP* LoadJPEG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 }
 
 /**
+ * Generate a BMP with the given size and color.
+ *
+ * @param w The width.
+ * @param h The height.
+ * @param r The red component.
+ * @param g The green component.
+ * @param b The blue component.
+ * @return The generated BMP, or 0 on failure.
+ */
+static BMP* MakeBMP(int w, int h, UINT8 r, UINT8 g, UINT8 b) {
+	BMP* bmp = 0;
+	BS->AllocatePool(EfiBootServicesData, 54 + w * h * 4, (void**) &bmp);
+	if (!bmp) {
+		Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
+		BS->Stall(1000000);
+		return 0;
+	}
+	*bmp = (BMP) {
+		.magic_BM = { 'B', 'M' },
+		.file_size = 54 + w * h * 4,
+		.pixel_data_offset = 54,
+		.dib_header_size = 40,
+		.width = w,
+		.height = h,
+		.planes = 1,
+		.bpp = 32,
+	};
+	UINT8* data = (UINT8*) bmp + bmp->pixel_data_offset;
+	for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
+		*data++ = b;
+		*data++ = g;
+		*data++ = r;
+		*data++ = 0;
+	}
+	return bmp;
+}
+
+/**
  * Load a bitmap or generate a black one.
  *
  * @param root_dir The root directory for loading a BMP.
@@ -974,30 +998,29 @@ static BMP* LoadJPEG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
  * @return The loaded BMP, or 0 if not available.
  */
 static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
-	BMP* bmp = 0;
 	if (!path) {
-		bmp = init_bmp(1, 1);
-		if (!bmp) {
-			Print(L"HackBGRT: Failed to allocate a blank BMP!\n");
-			BS->Stall(1000000);
-			return 0;
-		}
-		// Black dot
-		CopyMem(
-			((UINT8*)bmp)+54,
-			"\x00\x00\x00\x00",
-			4
-		);
-		return bmp;
+		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
 	Debug(L"HackBGRT: Loading %s.\n", path);
-
+	BMP* bmp = 0;
 	UINTN len = StrLen(path);
 	CHAR16 last_char_2 = path[len - 2];
 	Debug(L"HackBGRT: Filename Len %d, Last Char %c.\n", (int)len, last_char_2);
 	if (last_char_2 == 'm' || last_char_2 == 'M') {
 		// xxx.BMP
-		bmp = LoadFile(root_dir, path, 0);
+		UINTN size = 0;
+		bmp = LoadFile(root_dir, path, &size);
+		if (bmp) {
+			if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
+				// return bmp;
+			} else {
+				FreePool(bmp);
+				Print(L"HackBGRT: Invalid BMP (%s)!\n", path);
+				bmp = 0;
+			}
+		} else {
+			Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
+		}
 	} else if (last_char_2 == 'n' || last_char_2 == 'N') {
 		// xxx.PNG
 		bmp = LoadPNG(root_dir, path);
@@ -1006,15 +1029,43 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 		// xxx.JPEG
 		bmp = LoadJPEG(root_dir, path);
 	}
-	if (!bmp) {
-		Print(L"HackBGRT: Failed to load BMP (%s)!\n", path);
-		BS->Stall(1000000);
-		return 0;
+	if (bmp) {
+		Debug(L"HackBGRT: Load Success %s.\n", path);
+
+		return bmp;
 	}
 
-	Debug(L"HackBGRT: Load Success %s.\n", path);
+	Print(L"HackBGRT: Failed to load IMAGE (%s)!\n", path);
+	BS->Stall(1000000);
+	return MakeBMP(16, 16, 255, 0, 0); // error = red image
+}
 
-	return bmp;
+/**
+ * Crop a BMP to the given size.
+ *
+ * @param bmp The BMP to crop.
+ * @param w The maximum width.
+ * @param h The maximum height.
+ */
+static void CropBMP(BMP* bmp, int w, int h) {
+	const int old_pitch = -(-(bmp->width * (bmp->bpp / 8)) & ~3);
+	bmp->image_size = 0;
+	bmp->width = min(bmp->width, w);
+	bmp->height = min(bmp->height, h);
+	const int h_max = (bmp->file_size - bmp->pixel_data_offset) / old_pitch;
+	bmp->height = min(bmp->height, h_max);
+	const int new_pitch = -(-(bmp->width * (bmp->bpp / 8)) & ~3);
+
+	if (new_pitch < old_pitch) {
+		for (int i = 1; i < bmp->height; ++i) {
+			CopyMem(
+				(UINT8*) bmp + bmp->pixel_data_offset + i * new_pitch,
+				(UINT8*) bmp + bmp->pixel_data_offset + i * old_pitch,
+				new_pitch
+			);
+		}
+	}
+	bmp->file_size = bmp->pixel_data_offset + bmp->height * new_pitch;
 }
 
 /**
@@ -1032,14 +1083,15 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 	// KEEP/REPLACE: first get the old BGRT entry.
 	ACPI_BGRT* bgrt = HandleAcpiTables(HackBGRT_KEEP, 0);
 
-	// Get the old BMP and position, if possible.
-	BMP* old_bmp = 0;
-	int old_x = 0, old_y = 0;
-	if (bgrt && VerifyAcpiSdtChecksum(bgrt)) {
-		old_bmp = (BMP*) (UINTN) bgrt->image_address;
-		old_x = bgrt->image_offset_x;
-		old_y = bgrt->image_offset_y;
-	}
+	// Get the old BMP and position (relative to screen center), if possible.
+	const int old_valid = bgrt && VerifyAcpiSdtChecksum(bgrt);
+	BMP* old_bmp = old_valid ? (BMP*) (UINTN) bgrt->image_address : 0;
+	const int old_orientation = old_valid ? ((bgrt->status >> 1) & 3) : 0;
+	const int old_swap = old_orientation & 1;
+	const int old_reso_x = old_swap ? config.old_resolution_y : config.old_resolution_x;
+	const int old_reso_y = old_swap ? config.old_resolution_x : config.old_resolution_y;
+	const int old_x = old_bmp ? bgrt->image_offset_x + (old_bmp->width - old_reso_x) / 2 : 0;
+	const int old_y = old_bmp ? bgrt->image_offset_y + (old_bmp->height - old_reso_y) / 2 : 0;
 
 	// Missing BGRT?
 	if (!bgrt) {
@@ -1055,12 +1107,19 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		}
 	}
 
-	// Clear the BGRT.
-	const char data[0x38] =
-		"BGRT" "\x38\x00\x00\x00" "\x00" "\xd6" "Mtblx*" "HackBGRT"
-		"\x20\x17\x00\x00" "PTL " "\x02\x00\x00\x00"
-		"\x01\x00" "\x00" "\x00";
-	CopyMem(bgrt, data, sizeof(data));
+	*bgrt = (ACPI_BGRT) {
+		.header = {
+			.signature = "BGRT",
+			.length = sizeof(*bgrt),
+			.revision = 1,
+			.oem_id = "Mtblx*",
+			.oem_table_id = "HackBGRT",
+			.oem_revision = 1,
+			.asl_compiler_id = *(const UINT32*) "None",
+			.asl_compiler_revision = 1,
+		},
+		.version = 1,
+	};
 
 	// Get the image (either old or new).
 	BMP* new_bmp = old_bmp;
@@ -1074,26 +1133,50 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		return;
 	}
 
+	// Crop the image to screen.
+	CropBMP(new_bmp, config.resolution_x, config.resolution_y);
+
+	// Set the image address and orientation.
 	bgrt->image_address = (UINTN) new_bmp;
+	const int new_orientation = config.orientation == HackBGRT_coord_keep ? old_orientation : ((config.orientation / 90) & 3);
+	bgrt->status = new_orientation << 1;
 
-	// Calculate the automatically centered position for the image.
-	int auto_x = 0, auto_y = 0;
-	if (GOP()) {
-		auto_x = max(0, ((int)GOP()->Mode->Info->HorizontalResolution - (int)new_bmp->width) / 2);
-		auto_y = max(0, ((int)GOP()->Mode->Info->VerticalResolution * 2/3 - (int)new_bmp->height) / 2);
-	} else if (old_bmp) {
-		auto_x = max(0, old_x + ((int)old_bmp->width - (int)new_bmp->width) / 2);
-		auto_y = max(0, old_y + ((int)old_bmp->height - (int)new_bmp->height) / 2);
-	}
+	// New center coordinates.
+	const int new_x = config.image_x == HackBGRT_coord_keep ? old_x : config.image_x;
+	const int new_y = config.image_y == HackBGRT_coord_keep ? old_y : config.image_y;
+	const int new_swap = new_orientation & 1;
+	const int new_reso_x = new_swap ? config.resolution_y : config.resolution_x;
+	const int new_reso_y = new_swap ? config.resolution_x : config.resolution_y;
 
-	// Set the position (manual, automatic, original).
-	bgrt->image_offset_x = SelectCoordinate(config.image_x, auto_x, old_x);
-	bgrt->image_offset_y = SelectCoordinate(config.image_y, auto_y, old_y);
-	Debug(L"HackBGRT: BMP at (%d, %d).\n", (int) bgrt->image_offset_x, (int) bgrt->image_offset_y);
+	// Calculate absolute position.
+	const int max_x = new_reso_x - new_bmp->width;
+	const int max_y = new_reso_y - new_bmp->height;
+	bgrt->image_offset_x = max(0, min(max_x, new_x + (new_reso_x - new_bmp->width) / 2));
+	bgrt->image_offset_y = max(0, min(max_y, new_y + (new_reso_y - new_bmp->height) / 2));
+
+	Debug(
+		L"HackBGRT: BMP at (%d, %d), center (%d, %d), resolution (%d, %d) with orientation %d applied.\n",
+		(int) bgrt->image_offset_x, (int) bgrt->image_offset_y,
+		new_x, new_y, new_reso_x, new_reso_y,
+		new_orientation * 90
+	);
 
 	// Store this BGRT in the ACPI tables.
 	SetAcpiSdtChecksum(bgrt);
 	HandleAcpiTables(HackBGRT_REPLACE, bgrt);
+}
+
+/**
+ * Load an application.
+ */
+static EFI_HANDLE LoadApp(print_t* print_failure, EFI_HANDLE image_handle, EFI_LOADED_IMAGE* image, const CHAR16* path) {
+	EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) path);
+	EFI_HANDLE result = 0;
+	Debug(L"HackBGRT: Loading application %s.\n", path);
+	if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &result))) {
+		print_failure(L"HackBGRT: Failed to load application %s.\n", path);
+	}
+	return result;
 }
 
 /**
@@ -1129,33 +1212,38 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	HackBgrt(root_dir);
 
 	EFI_HANDLE next_image_handle = 0;
-	if (!config.boot_path) {
-		Print(L"HackBGRT: Boot path not specified.\n");
+	static CHAR16 backup_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";
+	static CHAR16 ms_boot_path[] = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
+
+	if (config.boot_path && StriCmp(config.boot_path, L"MS") != 0) {
+		next_image_handle = LoadApp(Print, image_handle, image, config.boot_path);
 	} else {
-		Debug(L"HackBGRT: Loading application %s.\n", config.boot_path);
-		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) config.boot_path);
-		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-			Print(L"HackBGRT: Failed to load application %s.\n", config.boot_path);
+		config.boot_path = backup_boot_path;
+		next_image_handle = LoadApp(Debug, image_handle, image, config.boot_path);
+		if (!next_image_handle) {
+			config.boot_path = ms_boot_path;
+			next_image_handle = LoadApp(Debug, image_handle, image, config.boot_path);
 		}
 	}
 	if (!next_image_handle) {
-		static CHAR16 default_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";
-		Debug(L"HackBGRT: Loading application %s.\n", default_boot_path);
-		EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, default_boot_path);
-		if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &next_image_handle))) {
-			Print(L"HackBGRT: Also failed to load application %s.\n", default_boot_path);
+		config.boot_path = backup_boot_path;
+		next_image_handle = LoadApp(Print, image_handle, image, config.boot_path);
+		if (!next_image_handle) {
+			config.boot_path = ms_boot_path;
+			next_image_handle = LoadApp(Print, image_handle, image, config.boot_path);
+			if (!next_image_handle) {
+				goto fail;
+			}
+		}
+		Print(L"HackBGRT: Reverting to %s.\n", config.boot_path);
+		Print(L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
+		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			goto fail;
 		}
-		Print(L"HackBGRT: Reverting to %s.\n", default_boot_path);
-		Print(L"Press escape to cancel, any other key to boot.\n");
-		if (ReadKey().ScanCode == SCAN_ESC) {
-			goto fail;
-		}
-		config.boot_path = default_boot_path;
-	}
-	if (config.debug) {
-		Print(L"HackBGRT: Ready to boot.\nPress escape to cancel, any other key to boot.\n");
-		if (ReadKey().ScanCode == SCAN_ESC) {
+	} else if (config.debug) {
+		Print(L"HackBGRT: Ready to boot. Disable debug mode to skip this screen.\n");
+		Print(L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
+		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			return 0;
 		}
 	}
@@ -1164,6 +1252,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 	Print(L"HackBGRT: Started %s. Why are we still here?!\n", config.boot_path);
+	Print(L"Please check that %s is not actually HackBGRT!\n", config.boot_path);
 	goto fail;
 
 	fail: {
@@ -1174,8 +1263,8 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		#else
 			Print(L"HackBGRT version: unknown; not an official release?\n");
 		#endif
-		Print(L"Press any key to exit.\n");
-		ReadKey();
+		Print(L"Press any key (or wait 15 seconds) to exit.\n");
+		ReadKey(15000);
 		return 1;
 	}
 }

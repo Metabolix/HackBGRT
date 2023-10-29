@@ -1,36 +1,39 @@
 ﻿# vim: set fileencoding=utf-8
 # The same options may be given also as command line parameters in the EFI Shell, which is useful for debugging.
 
-# Boot loader path. Default: backup of the Windows boot loader.
-boot=\EFI\HackBGRT\bootmgfw-original.efi
+# Boot loader path. MS = either backup or original Windows boot loader.
+boot=MS
 
 # The image is specified with an image line.
 # Multiple image lines may be present, in which case one will be picked by random.
 # The image line may contain the following parts:
 # Any of the following:
-#  - "n=[0-9]+", a weight for this image in the randomization process. Default: n=1.
-#  - "x={auto|native|[0-9]+}", the x coordinate. Default: x=auto.
-#  - "y={auto|native|[0-9]+}", the y coordinate. Default: y=auto.
+#  - "n=(number)", a weight for this image in the randomization process. Default: n=1.
+#  - "x=(number)" or "x=keep", the x offset from the center. Default: x=0.
+#  - "y=(number)" or "y=keep", the y offset from the center. Default: y=0.
+#  - "o=(0|90|180|270|keep)", the screen orientation, degrees anticlockwise. Default: o=keep.
 # One of the following:
-#  - "keep" to keep the firmware logo. Sets also x=native,y=native by default.
+#  - "keep" to keep the firmware logo. Also keeps coordinates by default.
 #  - "remove" to remove the BGRT. Makes x and y meaningless.
 #  - "black" to use only a black image. Makes x and y meaningless.
-#  - "path=..." to read a BMP file. The file must be a 24-bit BMP file with a 54-byte header.
+#  - "path=..." to read a BMP file.
+#    * NOTE: For path=\EFI\HackBGRT\*, the installer will copy and convert the file if necessary.
+#    * NOTE: For other paths, make sure that the file is a 24-bit BMP file with a 54-byte header.
 #    * NOTE: The file must be on the EFI System Partition. Do not add a drive letter!
 # Examples:
 #  - image=remove
 #  - image=black
-#  - image=x=auto,y=0,path=\EFI\HackBGRT\topimage.bmp
-#  - image=n=1,path=\EFI\HackBGRT\splash.bmp
-#  - image=n=50,path=\EFI\HackBGRT\probable.bmp
+#  - image= x=0 y=-200 path=\EFI\HackBGRT\topimage.bmp
+#  - image= n=1 o=90 path=\EFI\HackBGRT\sideways.bmp
+#  - image= n=50 y=999999 o=keep path=\EFI\HackBGRT\probable.bmp
 # The above examples together would produce
 #  - 1/54 chance for the default OS logo
 #  - 1/54 chance for black screen
-#  - 1/54 chance for topimage.bmp, centered at the top of the screen
-#  - 1/54 chance for splash.bmp, automatically positioned
-#  - 50/54 chance for probable.bmp, automatically positioned
+#  - 1/54 chance for topimage.bmp, 200 px above the center of the screen
+#  - 1/54 chance for splash.bmp, centered, orientation set to 90 degrees
+#  - 50/54 chance for probable.bmp, at the bottom edge, explicitly default orientation
 # Default: just one image.
-image=path=\EFI\HackBGRT\splash.bmp
+image= y=-200 path=\EFI\HackBGRT\splash.bmp
 
 # Preferred resolution. Use 0x0 for maximum and -1x-1 for original.
 resolution=0x0

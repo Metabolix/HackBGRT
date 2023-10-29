@@ -8,6 +8,9 @@ cd HackBGRT_MULTI
 
 # Download gnu-efi
 wget https://jaist.dl.sourceforge.net/project/gnu-efi/gnu-efi-3.0.12.tar.bz2
+ or
+# ERROR: The certificate of ‘jaist.dl.sourceforge.net’ is not trusted.
+wget --no-check-certificate https://jaist.dl.sourceforge.net/project/gnu-efi/gnu-efi-3.0.12.tar.bz2
 tar xvf gnu-efi-3.0.12.tar.bz2
 
 # Patch Install directory

@@ -68,14 +68,15 @@ void RandomSeedAuto(void) {
 	RandomSeed(a, b), Random(), Random();
 }
 
-void WaitKey(void) {
+EFI_STATUS WaitKey(UINT64 timeout_ms) {
 	ST->ConIn->Reset(ST->ConIn, FALSE);
-	WaitForSingleEvent(ST->ConIn->WaitForKey, 0);
+	const int ms_to_100ns = 10000;
+	return WaitForSingleEvent(ST->ConIn->WaitForKey, timeout_ms * ms_to_100ns);
 }
 
-EFI_INPUT_KEY ReadKey(void) {
-	WaitKey();
+EFI_INPUT_KEY ReadKey(UINT64 timeout_ms) {
 	EFI_INPUT_KEY key = {0};
+	WaitKey(timeout_ms);
 	ST->ConIn->ReadKeyStroke(ST->ConIn, &key);
 	return key;
 }
