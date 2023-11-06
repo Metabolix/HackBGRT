@@ -2,3 +2,4 @@ boot*.efi
 setup.exe
 src/GIT_DESCRIBE.cs
 html
+efi_test/

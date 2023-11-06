@@ -42,3 +42,15 @@ bootia32.efi: CC_PREFIX = i686-w64-mingw32
 bootia32.efi: GNUEFI_ARCH = ia32
 bootia32.efi: $(FILES_C)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -s
+
+clean:
+	rm -f bootx64.efi bootia32.efi
+	rm -f setup.exe
+	rm -rf efi_test/
+
+testx64-qemu: bootx64.efi config.txt splash.bmp
+	mkdir -p efi_test/EFI/HackBGRT
+	cp bootx64.efi efi_test/EFI/HackBGRT/loader.efi && echo "bootx64 okay"
+	cp config.txt splash.bmp efi_test/EFI/HackBGRT/ && echo "aux files okay"
+	qemu-system-x86_64 -L /usr/share/ovmf/ --bios OVMF.fd -drive media=disk,file=fat:rw:./efi_test,format=raw -net none -serial stdio
+	# hit escape during boot, go to Boot Manager Maintenance, select Boot From File, select QEMU VVFAT, navigate to EFI>HackBGRT>loader.efi
