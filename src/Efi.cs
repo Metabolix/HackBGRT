@@ -55,6 +55,9 @@ public class Efi {
 		 * @return String representation of this object.
 		 */
 		public override string ToString() {
+			if (Data == null) {
+				return $"{Name} Guid={Guid} Attributes={Attributes} Data=null";
+			}
 			var hex = BitConverter.ToString(Data).Replace("-", " ");
 			var text = new string(Data.Select(c => 0x20 <= c && c <= 0x7f ? (char) c : ' ').ToArray());
 			return $"{Name} Guid={Guid} Attributes={Attributes} Text='{text}' Bytes='{hex}'";
@@ -442,6 +445,29 @@ public class Efi {
 			bootOrderInts.Insert(msPos < 0 ? 0 : msPos, ownNum);
 			bootOrder.Data = bootOrderInts.SelectMany(num => new byte[] { (byte)(num & 0xff), (byte)(num >> 8) }).ToArray();
 			SetVariable(bootOrder, dryRun);
+		}
+	}
+
+	/**
+	 * Log the boot entries.
+	 */
+	public static void LogBootEntries() {
+		try {
+			var bootOrder = GetVariable("BootOrder");
+			var bootCurrent = GetVariable("BootCurrent");
+			Setup.Log($"LogBootOrder: {bootOrder}");
+			Setup.Log($"LogBootOrder: {bootCurrent}");
+			var bootOrderInts = new List<UInt16>(BytesToUInt16s(bootOrder.Data));
+			// Windows can't enumerate EFI variables, and trying them all is too slow.
+			// BootOrder + BootCurrent + the first 0xff entries should be enough.
+			foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xff).Select(i => (UInt16) i))) {
+				var entry = GetVariable(String.Format("Boot{0:X04}", num));
+				if (entry.Data != null) {
+					Setup.Log($"LogBootOrder: {entry}");
+				}
+			}
+		} catch (Exception e) {
+			Setup.Log($"LogBootOrder failed: {e.ToString()}");
 		}
 	}
 
