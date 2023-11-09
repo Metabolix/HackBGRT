@@ -96,6 +96,9 @@ public class Setup {
 	/** @var Run in batch mode? */
 	protected bool Batch;
 
+	/** @var Is the loader signed? */
+	protected bool LoaderIsSigned = false;
+
 	/**
 	 * Output a line.
 	 */
@@ -311,8 +314,14 @@ public class Setup {
 	 * Install files to ESP.
 	 */
 	protected void InstallFiles() {
-		if (!File.Exists($"boot{EfiArch}.efi")) {
-			throw new SetupException($"Missing boot{EfiArch}.efi, {EfiArch} is not supported!");
+		var loaderSource = Path.Combine("efi-signed", $"boot{EfiArch}.efi");
+		LoaderIsSigned = true;
+		if (!File.Exists(loaderSource)) {
+			loaderSource = Path.Combine("efi", $"boot{EfiArch}.efi");
+			LoaderIsSigned = false;
+			if (!File.Exists(loaderSource)) {
+				throw new SetupException($"Missing boot{EfiArch}.efi, {EfiArch} is not supported!");
+			}
 		}
 		try {
 			if (!Directory.Exists(InstallPath)) {
@@ -332,7 +341,13 @@ public class Setup {
 				InstallImageFile(line.Substring(i + delim.Length));
 			}
 		}
-		InstallFile($"boot{EfiArch}.efi", "loader.efi");
+		InstallFile(loaderSource, "loader.efi");
+		if (LoaderIsSigned) {
+			InstallFile("certificate.cer");
+			WriteLine($"Notice: Remember to enroll the certificate.cer in your firmware!");
+		} else {
+			WriteLine($"Warning: HackBGRT is not signed, you may need to disable Secure Boot!");
+		}
 		WriteLine($"HackBGRT has been copied to {InstallPath}.");
 	}
 
@@ -540,6 +555,9 @@ public class Setup {
 				WriteLine("Secure Boot status could not be determined.");
 			}
 			WriteLine("It's very important to disable Secure Boot before installing.");
+			if (LoaderIsSigned) {
+				WriteLine("Alternatively, you can enroll the certificate.cer in your firmware.");
+			}
 			WriteLine("Otherwise your machine may become unbootable.");
 			if (Batch) {
 				if (allowSecureBoot) {

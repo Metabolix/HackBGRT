@@ -11,8 +11,16 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 **Important:** If you mess up the installation, your system may become unbootable! Create a rescue disk before use. This software comes with no warranty. Use at your own risk.
 
 * Make sure that your computer is booting with UEFI.
-* Make sure that Secure Boot is disabled, unless you know how to sign EFI applications.
+* Make sure that Secure Boot is disabled, unless you know how to manage certificates.
 * Make sure that BitLocker is disabled, or find your recovery key.
+
+### Secure Boot instructions
+
+HackBGRT is not approved by Microsoft. By default, the Secure Boot mechanism will not allow it to run. You will need to either disable Secure Boot (and BitLocker) or enroll the HackBGRT signing certificate `certificate.cer` (also installed in `EFI\HackBGRT\certificate.cer`) into your system. Trusting any self-signed certificates is not recommended, so if you wish to keep your system truly safe with Secure Boot, you should build HackBGRT locally and use your own certificate to sign it.
+
+Enrolling the certificate cannot be automated, that's the whole point of Secure Boot.
+
+Instructions for enrolling the certificate (if it's possible at all) depend on your computer model. Please refer to your motherboard manual or do a web search on *how to enroll Secure Boot certificate*. No support is provided for this option. Note that enrolling a custom certificate breaks PCR7 Binding and can cause problems with BitLocker Automatic Device Encryption. Make sure you have either disabled BitLocker or have the recovery key available.
 
 ### Windows installation
 

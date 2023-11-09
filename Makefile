@@ -15,12 +15,15 @@ CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
 ZIP = $(ZIPDIR).zip
 
-all: efi setup zip
-efi: bootx64.efi bootia32.efi
+.PHONY: all efi efi-signed setup zip
+
+all: efi setup
+efi: efi/bootx64.efi efi/bootia32.efi
+efi-signed: efi-signed/bootx64.efi efi-signed/bootia32.efi
 setup: setup.exe
 
 zip: $(ZIP)
-$(ZIP): bootx64.efi bootia32.efi config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE
+$(ZIP): efi-signed certificate.cer config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE
 	test ! -d "$(ZIPDIR)"
 	mkdir "$(ZIPDIR)"
 	cp -a $^ "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
@@ -33,12 +36,33 @@ src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
 	csc /define:GIT_DESCRIBE /out:$@ $^
 
-bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
-bootx64.efi: GNUEFI_ARCH = x86_64
-bootx64.efi: $(FILES_C)
+certificate.cer pki:
+	@echo
+	@echo "You need proper keys to sign the EFI executables."
+	@echo "Example:"
+	@echo "mkdir -p pki"
+	@echo "certutil --empty-password -N -d pki"
+	@echo "efikeygen -d pki -n HackBGRT-signer -S -k -c 'CN=HackBGRT Secure Boot Signer,OU=HackBGRT,O=Unknown,MAIL=unknown@example.com' -u 'URL'"
+	@echo "certutil -d pki -n HackBGRT-signer -Lr > certificate.cer"
+	@echo "Modify and run the commands yourself."
+	@echo
+	@false
+
+efi-signed/%.efi: efi/%.efi
+	mkdir -p efi-signed
+	pesign --force -n pki -i $< -o $@ -c HackBGRT-signer -s
+
+efi-signed/bootx64.efi: pki
+efi-signed/bootia32.efi: pki
+
+efi/bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
+efi/bootx64.efi: GNUEFI_ARCH = x86_64
+efi/bootx64.efi: $(FILES_C)
+	@mkdir -p efi
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -s
 
-bootia32.efi: CC_PREFIX = i686-w64-mingw32
-bootia32.efi: GNUEFI_ARCH = ia32
-bootia32.efi: $(FILES_C)
+efi/bootia32.efi: CC_PREFIX = i686-w64-mingw32
+efi/bootia32.efi: GNUEFI_ARCH = ia32
+efi/bootia32.efi: $(FILES_C)
+	@mkdir -p efi
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -s
