@@ -10,6 +10,8 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
+using System.Management;
+using Microsoft.Win32;
 
 [assembly: AssemblyInformationalVersionAttribute(GIT_DESCRIBE.data)]
 [assembly: AssemblyProductAttribute("HackBGRT")]
@@ -675,6 +677,40 @@ public class Setup {
 	}
 
 	/**
+	 * Log the boot time.
+	 *
+	 * @return The boot time, or null if it couldn't be determined.
+	 */
+	protected DateTime? GetBootTime() {
+		try {
+			var query = new ObjectQuery("SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
+			foreach (var m in new ManagementObjectSearcher(query).Get()) {
+				return ManagementDateTimeConverter.ToDateTime(m["LastBootUpTime"].ToString());
+			}
+		} catch (Exception e) {
+			Log($"GetBootTime failed: {e.ToString()}");
+		}
+		return null;
+	}
+
+	/**
+	 * Check if Hiberboot is enabled.
+	 *
+	 * @return True, if Hiberboot is enabled.
+	 */
+	protected bool IsHiberbootEnabled() {
+		try {
+			return (int) Registry.GetValue(
+				"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power",
+				"HiberbootEnabled",
+				0
+			) != 0;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
 	 * Ask for user's choice and install/uninstall.
 	 */
 	protected void ShowMenu() {
@@ -759,6 +795,16 @@ public class Setup {
 		InitEspInfo();
 		Efi.LogBGRT();
 		Efi.LogBootEntries();
+		if (GetBootTime() is DateTime bootTime) {
+			var configTime = new[] { File.GetCreationTime("config.txt"), File.GetLastWriteTime("config.txt") }.Max();
+			Log($"Boot time = {bootTime}, config.txt changed = {configTime}");
+			if (configTime > bootTime) {
+				WriteLine($"Windows was booted at {bootTime}. Remember to reboot after installing!");
+			}
+		}
+		if (IsHiberbootEnabled()) {
+			WriteLine("You may have to disable Fast Startup (Hiberboot) to reboot properly.");
+		}
 		bool allowSecureBoot = false;
 		bool allowBitLocker = false;
 		bool allowBadLoader = false;
