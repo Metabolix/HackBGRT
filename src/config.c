@@ -8,7 +8,7 @@ BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir,
 	UINTN data_bytes = 0;
 	data = LoadFileWithPadding(root_dir, path, &data_bytes, 4);
 	if (!data) {
-		Print(L"HackBGRT: Failed to load configuration (%s)!\n", path);
+		Log(1, L"HackBGRT: Failed to load configuration (%s)!\n", path);
 		return FALSE;
 	}
 	CHAR16* str;
@@ -74,9 +74,7 @@ static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum Ha
 	config->image_weight_sum += weight;
 	UINT32 random = Random();
 	UINT32 limit = 0xfffffffful / config->image_weight_sum * weight;
-	if (config->debug) {
-		Print(L"HackBGRT: weight %d, action %d, x %d, y %d, o %d, path %s, random = %08x, limit = %08x\n", weight, action, x, y, o, path, random, limit);
-	}
+	Log(config->debug, L"HackBGRT: n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, random = %08x, limit = %08x\n", weight, action, x, y, o, path, random, limit);
 	if (!config->image_weight_sum || random <= limit) {
 		config->action = action;
 		config->image_path = path;
@@ -112,7 +110,7 @@ static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) 
 	} else if (StrStr(line, L"keep")) {
 		action = HackBGRT_KEEP;
 	} else {
-		Print(L"HackBGRT: Invalid image line: %s\n", line);
+		Log(1, L"HackBGRT: Invalid image line: %s\n", line);
 		return;
 	}
 	int weight = n && (!f || n < f) ? Atoi(n) : 1;
@@ -129,7 +127,7 @@ static void ReadConfigResolution(struct HackBGRT_config* config, const CHAR16* l
 		config->resolution_x = *x == '-' ? -(int)Atoi(x+1) : (int)Atoi(x);
 		config->resolution_y = *y == '-' ? -(int)Atoi(y+1) : (int)Atoi(y);
 	} else {
-		Print(L"HackBGRT: Invalid resolution line: %s\n", line);
+		Log(1, L"HackBGRT: Invalid resolution line: %s\n", line);
 	}
 }
 
@@ -141,6 +139,10 @@ void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, co
 
 	if (StrnCmp(line, L"debug=", 6) == 0) {
 		config->debug = (StrCmp(line, L"debug=1") == 0);
+		return;
+	}
+	if (StrnCmp(line, L"log=", 4) == 0) {
+		config->log = (StrCmp(line, L"log=1") == 0);
 		return;
 	}
 	if (StrnCmp(line, L"image=", 6) == 0) {
@@ -159,5 +161,5 @@ void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, co
 		ReadConfigResolution(config, line + 11);
 		return;
 	}
-	Print(L"Unknown configuration directive: %s\n", line);
+	Log(1, L"Unknown configuration directive: %s\n", line);
 }

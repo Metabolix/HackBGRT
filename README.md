@@ -48,6 +48,7 @@ Instructions for enrolling the certificate (if it's possible at all) depend on y
 	* `allow-bad-loader` – ignore bad boot loader configuration in subsequent commands.
 	* `disable` – run all relevant `disable-*` commands.
 	* `uninstall` – disable and remove completely.
+	* `show-boot-log` – show the debug log collected during boot (if `log=1` is set in `config.txt`).
 * For example, run `setup.exe batch install allow-secure-boot enable-overwrite` to copy files and overwrite the MS boot loader regardless of Secure Boot status.
 
 ### Multi-boot configurations

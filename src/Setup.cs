@@ -69,6 +69,7 @@ public class Setup {
 		"disable",
 		"uninstall",
 		"boot-to-fw",
+		"show-boot-log",
 	};
 
 	/** @var The target directory. */
@@ -751,6 +752,7 @@ public class Setup {
 		WriteLine(" B = boot to UEFI setup");
 		WriteLine("     - lets you disable Secure Boot");
 		WriteLine("     - lets you move HackBGRT before Windows in boot order");
+		WriteLine(" L = show boot log (what HackBGRT did during boot)");
 		WriteLine(" C = cancel");
 
 		var k = Console.ReadKey().Key;
@@ -773,6 +775,8 @@ public class Setup {
 			RunPrivilegedActions(new string[] { "uninstall" });
 		} else if (k == ConsoleKey.B) {
 			RunPrivilegedActions(new string[] { "boot-to-fw" });
+		} else if (k == ConsoleKey.L) {
+			RunPrivilegedActions(new string[] { "show-boot-log" });
 		} else if (k == ConsoleKey.C) {
 			throw new ExitSetup(1);
 		} else {
@@ -806,6 +810,8 @@ public class Setup {
 
 		InitEspPath();
 		InitEspInfo();
+		var bootLog = $"\n--- BOOT LOG START ---\n{Efi.GetHackBGRTLog()}\n--- BOOT LOG END ---";
+		Setup.Log(bootLog);
 		Efi.LogBGRT();
 		Efi.LogBootEntries();
 		if (GetBootTime() is DateTime bootTime) {
@@ -869,6 +875,8 @@ public class Setup {
 				Uninstall();
 			} else if (arg == "boot-to-fw") {
 				BootToFW();
+			} else if (arg == "show-boot-log") {
+				WriteLine(bootLog);
 			} else {
 				throw new SetupException($"Invalid action: '{arg}'!");
 			}
@@ -934,7 +942,7 @@ public class Setup {
 				WriteLine("This was a dry run, your system was not actually modified.");
 			}
 			if (!Batch) {
-				WriteLine("If you need to report a bug, please include the setup.log file.");
+				WriteLine("If you need to report a bug,\n - run this setup again with menu option L (show-boot-log)\n - then include the setup.log file with your report.");
 				WriteLine("Press any key to quit.");
 				Console.ReadKey();
 			}

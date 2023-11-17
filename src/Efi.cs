@@ -139,8 +139,19 @@ public class Efi {
 		}
 	}
 
+	/**
+	 * GUID of the global EFI variables.
+	 */
 	public const string EFI_GLOBAL_GUID = "{8be4df61-93ca-11d2-aa0d-00e098032b8c}";
 
+	/**
+	 * GUID for HackBGRT EFI variables.
+	 */
+	public const string EFI_HACKBGRT_GUID = "{03c64761-075f-4dba-abfb-2ed89e18b236}";
+
+	/**
+	 * Directory containing EFI variables in Linux.
+	 */
 	public const string LinuxEfiDir = "/sys/firmware/efi/efivars";
 
 	/**
@@ -468,6 +479,18 @@ public class Efi {
 			}
 		} catch (Exception e) {
 			Setup.Log($"LogBootOrder failed: {e.ToString()}");
+		}
+	}
+
+	/**
+	 * Retrieve HackBGRT log collected during boot.
+	 */
+	public static string GetHackBGRTLog() {
+		try {
+			var log = GetVariable("HackBGRTLog", EFI_HACKBGRT_GUID);
+			return new string(BytesToUInt16s(log.Data).Select(i => (char)i).ToArray());
+		} catch (Exception e) {
+			return $"Log not found: {e.ToString()}";
 		}
 	}
 
