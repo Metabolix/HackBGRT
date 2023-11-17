@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.2.0 - 2023-11-17
+
+### Added
+- Support Secure Boot with *shim* boot loader.
+- Gather debug log during boot and read it with setup.exe.
+
 ## 2.1.0 - 2023-10-04
 
 ### Added
