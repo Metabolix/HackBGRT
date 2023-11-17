@@ -15,7 +15,7 @@ CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
 ZIP = $(ZIPDIR).zip
 
-.PHONY: all efi efi-signed setup zip
+.PHONY: all efi efi-signed setup zip clean
 
 all: efi setup
 efi: efi/bootx64.efi efi/bootia32.efi
@@ -66,3 +66,6 @@ efi/bootia32.efi: GNUEFI_ARCH = ia32
 efi/bootia32.efi: $(FILES_C)
 	@mkdir -p efi
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -s
+
+clean:
+	rm -rf setup.exe efi efi-signed
