@@ -11,26 +11,24 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 **Important:** If you mess up the installation, your system may become unbootable! Create a rescue disk before use. This software comes with no warranty. Use at your own risk.
 
 * Make sure that your computer is booting with UEFI.
-* Make sure that Secure Boot is disabled, unless you know how to manage certificates.
+* Make sure that you have read the Secure Boot instructions.
 * Make sure that BitLocker is disabled, or find your recovery key.
 
 ### Secure Boot instructions
 
-HackBGRT is not approved by Microsoft. By default, the Secure Boot mechanism will not allow it to run. You will need to either disable Secure Boot (and BitLocker) or enroll the HackBGRT signing certificate `certificate.cer` (also installed in `EFI\HackBGRT\certificate.cer`) into your system. Trusting any self-signed certificates is not recommended, so if you wish to keep your system truly safe with Secure Boot, you should build HackBGRT locally and use your own certificate to sign it.
+HackBGRT is not approved by Microsoft. Instead, HackBGRT comes with the *shim* boot loader, which allows to manually select HackBGRT as a trusted program. After installing HackBGRT and rebooting your computer, you have to **follow the instructions in [shim.md](shim.md)** to achieve this. These steps cannot be automated, that's the whole point of Secure Boot. Although HackBGRT is self-signed with a certificate, it's not advisable to enroll foreign certificates directly into your firmware.
 
-Enrolling the certificate cannot be automated, that's the whole point of Secure Boot.
-
-Instructions for enrolling the certificate (if it's possible at all) depend on your computer model. Please refer to your motherboard manual or do a web search on *how to enroll Secure Boot certificate*. No support is provided for this option. Note that enrolling a custom certificate breaks PCR7 Binding and can cause problems with BitLocker Automatic Device Encryption. Make sure you have either disabled BitLocker or have the recovery key available.
+The *shim* boot loader is maintained by Red Hat, Inc, and the included signed copy of *shim* is extracted from Debian GNU/Linux – many thanks to the maintainers! For copyright information, see [shim-signed/COPYRIGHT](shim-signed/COPYRIGHT).
 
 ### Windows installation
 
 * Get the latest release from the Releases page.
 * Start `setup.exe` and follow the instructions.
-	* You may need to manually disable Secure Boot and then retry.
 	* The installer will launch Paint for editing the image.
 	* If Windows later restores the original boot loader, just reinstall.
 	* If you wish to change the image or other configuration, just reinstall.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
+	* After installing, read the instructions in [shim.md](shim.md) and reboot your computer.
 
 ### Quiet (batch) installation
 
@@ -43,6 +41,7 @@ Instructions for enrolling the certificate (if it's possible at all) depend on y
 	* `disable-bootmgr` – use `bcdedit` to disable the EFI boot entry.
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
+	* `skip-shim` – skip *shim* when installing.
 	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
 	* `allow-bitlocker` – ignore BitLocker in subsequent commands.
 	* `allow-bad-loader` – ignore bad boot loader configuration in subsequent commands.

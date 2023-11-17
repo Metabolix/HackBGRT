@@ -53,6 +53,7 @@ public class Setup {
 	public enum BootLoaderType {
 		None,
 		Own,
+		Shim,
 		Microsoft,
 		Other,
 	}
@@ -63,6 +64,7 @@ public class Setup {
 		"allow-secure-boot",
 		"allow-bitlocker",
 		"allow-bad-loader",
+		"skip-shim",
 		"enable-entry", "disable-entry",
 		"enable-bcdedit", "disable-bcdedit",
 		"enable-overwrite", "disable-overwrite",
@@ -210,6 +212,8 @@ public class Setup {
 			string tmp = System.Text.Encoding.ASCII.GetString(data);
 			if (tmp.IndexOf("HackBGRT") >= 0 || tmp.IndexOf("HackBgrt") >= 0) {
 				return BootLoaderType.Own;
+			} else if (tmp.IndexOf("UEFI shim") >= 0) {
+				return BootLoaderType.Shim;
 			} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
 				return BootLoaderType.Microsoft;
 			} else {
@@ -313,8 +317,10 @@ public class Setup {
 
 	/**
 	 * Install files to ESP.
+	 *
+	 * @param skipShim Whether to skip installing shim.
 	 */
-	protected void InstallFiles() {
+	protected void InstallFiles(bool skipShim) {
 		var loaderSource = Path.Combine("efi-signed", $"boot{EfiArch}.efi");
 		LoaderIsSigned = true;
 		if (!File.Exists(loaderSource)) {
@@ -322,6 +328,16 @@ public class Setup {
 			LoaderIsSigned = false;
 			if (!File.Exists(loaderSource)) {
 				throw new SetupException($"Missing boot{EfiArch}.efi, {EfiArch} is not supported!");
+			}
+		}
+		var shimSource = Path.Combine("shim-signed", $"shim{EfiArch}.efi");
+		var mmSource = Path.Combine("shim-signed", $"mm{EfiArch}.efi");
+		if (!skipShim) {
+			if (!File.Exists(shimSource)) {
+				throw new SetupException($"Missing shim ({shimSource}), can't install shim for {EfiArch}!");
+			}
+			if (!File.Exists(mmSource)) {
+				throw new SetupException($"Missing MokManager ({mmSource}), can't install shim for {EfiArch}!");
 			}
 		}
 		try {
@@ -342,14 +358,32 @@ public class Setup {
 				InstallImageFile(line.Substring(i + delim.Length));
 			}
 		}
-		InstallFile(loaderSource, "loader.efi");
+		var loaderDest = "loader.efi";
+		if (!skipShim) {
+			InstallFile(shimSource, loaderDest);
+			InstallFile(mmSource, $"mm{EfiArch}.efi");
+			loaderDest = $"grub{EfiArch}.efi";
+		}
+		InstallFile(loaderSource, loaderDest);
 		if (LoaderIsSigned) {
 			InstallFile("certificate.cer");
-			WriteLine($"Notice: Remember to enroll the certificate.cer in your firmware!");
-		} else {
-			WriteLine($"Warning: HackBGRT is not signed, you may need to disable Secure Boot!");
 		}
 		WriteLine($"HackBGRT has been copied to {InstallPath}.");
+
+		var enrollHashPath = $"EFI\\HackBGRT\\{loaderDest}";
+		var enrollKeyPath = "EFI\\HackBGRT\\certificate.cer";
+		if (skipShim) {
+			if (LoaderIsSigned) {
+				WriteLine($"Remember to enroll {enrollKeyPath} in your firmware!");
+			} else {
+				WriteLine("This HackBGRT build is not signed. You may need to disable Secure Boot.");
+			}
+		} else {
+			WriteLine($"On first boot, select 'Enroll hash from disk' and enroll {enrollHashPath}.");
+			if (LoaderIsSigned) {
+				WriteLine($"Alternatively, select 'Enroll key from disk' and enroll {enrollKeyPath}.");
+			}
+		}
 	}
 
 	/**
@@ -423,7 +457,6 @@ public class Setup {
 	protected void OverwriteMsLoader() {
 		var ms = Esp.MsLoaderPath;
 		var backup = BackupLoaderPath;
-		var own = Path.Combine(InstallPath, "loader.efi");
 
 		if (DetectLoader(ms) == BootLoaderType.Microsoft) {
 			InstallFile(ms, backup, false);
@@ -432,8 +465,13 @@ public class Setup {
 			// Duplicate check, but better to be sure...
 			throw new SetupException("Missing MS boot loader backup!");
 		}
+		var msDir = Path.GetDirectoryName(ms);
+		var msGrub = Path.Combine(msDir, $"grub{EfiArch}.efi");
+		var msMm = Path.Combine(msDir, $"mm{EfiArch}.efi");
 		try {
-			InstallFile(own, ms, false);
+			InstallFile(Path.Combine(InstallPath, "loader.efi"), ms, false);
+			InstallFile(Path.Combine(InstallPath, $"grub{EfiArch}.efi"), msGrub, false);
+			InstallFile(Path.Combine(InstallPath, $"mm{EfiArch}.efi"), msMm, false);
 		} catch (SetupException e) {
 			WriteLine(e.Message);
 			if (DetectLoader(ms) != BootLoaderType.Microsoft) {
@@ -452,7 +490,7 @@ public class Setup {
 	 */
 	protected void RestoreMsLoader() {
 		var ms = Esp.MsLoaderPath;
-		if (DetectLoader(ms) == BootLoaderType.Own) {
+		if (DetectLoader(ms) == BootLoaderType.Own || DetectLoader(ms) == BootLoaderType.Shim) {
 			WriteLine("Disabling an old version of HackBGRT.");
 			InstallFile(BackupLoaderPath, ms, false);
 			WriteLine($"{ms} has been restored.");
@@ -827,6 +865,7 @@ public class Setup {
 		bool allowSecureBoot = false;
 		bool allowBitLocker = false;
 		bool allowBadLoader = false;
+		bool skipShim = false;
 		Action<Action> verify = (Action revert) => {
 			try {
 				VerifyLoaderConfig();
@@ -842,7 +881,9 @@ public class Setup {
 			}
 		};
 		Action<Action, Action> enable = (Action enable, Action revert) => {
-			HandleSecureBoot(allowSecureBoot);
+			if (skipShim) {
+				HandleSecureBoot(allowSecureBoot);
+			}
 			HandleBitLocker(allowBitLocker);
 			enable();
 			verify(revert);
@@ -850,13 +891,15 @@ public class Setup {
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
 			if (arg == "install") {
-				InstallFiles();
+				InstallFiles(skipShim);
 			} else if (arg == "allow-secure-boot") {
 				allowSecureBoot = true;
 			} else if (arg == "allow-bitlocker") {
 				allowBitLocker = true;
 			} else if (arg == "allow-bad-loader") {
 				allowBadLoader = true;
+			} else if (arg == "skip-shim") {
+				skipShim = true;
 			} else if (arg == "enable-entry") {
 				enable(() => EnableEntry(), () => DisableEntry());
 			} else if (arg == "disable-entry") {

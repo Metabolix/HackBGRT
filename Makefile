@@ -23,7 +23,7 @@ efi-signed: efi-signed/bootx64.efi efi-signed/bootia32.efi
 setup: setup.exe
 
 zip: $(ZIP)
-$(ZIP): efi-signed certificate.cer config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE
+$(ZIP): efi-signed certificate.cer config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE shim-signed shim.md
 	test ! -d "$(ZIPDIR)"
 	mkdir "$(ZIPDIR)"
 	cp -a $^ "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
