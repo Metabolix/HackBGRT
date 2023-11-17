@@ -10,7 +10,7 @@ GNUEFI_LIB = /usr/$(CC_PREFIX)/lib
 FILES_C = src/main.c src/util.c src/types.c src/config.c src/sbat.c
 FILES_H = $(wildcard src/*.h)
 FILES_CS = src/Setup.cs src/Esp.cs src/Efi.cs
-GIT_DESCRIBE = $(firstword $(shell git describe --tags) unknown)
+GIT_DESCRIBE := $(firstword $(GIT_DESCRIBE) $(shell git describe --tags) unknown)
 CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)"'
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
 ZIP = $(ZIPDIR).zip
