@@ -1001,12 +1001,11 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	if (!path) {
 		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
-<<<<<<< HEAD
-	Debug(L"HackBGRT: Loading %s.\n", path);
+	Log(config.debug, L"HackBGRT: Loading %s.\n", path);
 	BMP* bmp = 0;
 	UINTN len = StrLen(path);
 	CHAR16 last_char_2 = path[len - 2];
-	Debug(L"HackBGRT: Filename Len %d, Last Char %c.\n", (int)len, last_char_2);
+	Log(config.debug, L"HackBGRT: Filename Len %d, Last Char %c.\n", (int)len, last_char_2);
 	if (last_char_2 == 'm' || last_char_2 == 'M') {
 		// xxx.BMP
 		UINTN size = 0;
@@ -1029,27 +1028,14 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 		// xxx.JPG
 		// xxx.JPEG
 		bmp = LoadJPEG(root_dir, path);
-=======
-	Log(config.debug, L"HackBGRT: Loading %s.\n", path);
-	UINTN size = 0;
-	BMP* bmp = LoadFile(root_dir, path, &size);
-	if (bmp) {
-		if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
-			return bmp;
-		}
-		FreePool(bmp);
-		Log(1, L"HackBGRT: Invalid BMP (%s)!\n", path);
-	} else {
-		Log(1, L"HackBGRT: Failed to load BMP (%s)!\n", path);
->>>>>>> origin/master
 	}
 	if (bmp) {
-		Debug(L"HackBGRT: Load Success %s.\n", path);
+		Log(config.debug, L"HackBGRT: Load Success %s.\n", path);
 
 		return bmp;
 	}
 
-	Print(L"HackBGRT: Failed to load IMAGE (%s)!\n", path);
+	Log(1, L"HackBGRT: Failed to load IMAGE (%s)!\n", path);
 	BS->Stall(1000000);
 	return MakeBMP(16, 16, 255, 0, 0); // error = red image
 }
