@@ -47,6 +47,9 @@ LDFLAGS = -nostdlib --warn-common --no-undefined \
 # set EFI_SUBSYSTEM: Application(0x0a)
 LDFLAGS += --defsym=EFI_SUBSYSTEM=0x0a
 LDFLAGS += -L$(PREFIX)/lib
+# ld: warning: ./gnu-efi/usr/local//lib/crt0-efi-x86_64.o: missing .note.GNU-stack section implies executable stack
+# ld: NOTE: This behaviour is deprecated and will be removed in a future version of the linker
+LDFLAGS += -z noexecstack
 
 
 ####### rules #########
