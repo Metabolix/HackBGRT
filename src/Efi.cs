@@ -55,6 +55,9 @@ public class Efi {
 		 * @return String representation of this object.
 		 */
 		public override string ToString() {
+			if (Data == null) {
+				return $"{Name} Guid={Guid} Attributes={Attributes} Data=null";
+			}
 			var hex = BitConverter.ToString(Data).Replace("-", " ");
 			var text = new string(Data.Select(c => 0x20 <= c && c <= 0x7f ? (char) c : ' ').ToArray());
 			return $"{Name} Guid={Guid} Attributes={Attributes} Text='{text}' Bytes='{hex}'";
@@ -136,8 +139,19 @@ public class Efi {
 		}
 	}
 
+	/**
+	 * GUID of the global EFI variables.
+	 */
 	public const string EFI_GLOBAL_GUID = "{8be4df61-93ca-11d2-aa0d-00e098032b8c}";
 
+	/**
+	 * GUID for HackBGRT EFI variables.
+	 */
+	public const string EFI_HACKBGRT_GUID = "{03c64761-075f-4dba-abfb-2ed89e18b236}";
+
+	/**
+	 * Directory containing EFI variables in Linux.
+	 */
 	public const string LinuxEfiDir = "/sys/firmware/efi/efivars";
 
 	/**
@@ -446,6 +460,41 @@ public class Efi {
 	}
 
 	/**
+	 * Log the boot entries.
+	 */
+	public static void LogBootEntries() {
+		try {
+			var bootOrder = GetVariable("BootOrder");
+			var bootCurrent = GetVariable("BootCurrent");
+			Setup.Log($"LogBootOrder: {bootOrder}");
+			Setup.Log($"LogBootOrder: {bootCurrent}");
+			var bootOrderInts = new List<UInt16>(BytesToUInt16s(bootOrder.Data));
+			// Windows can't enumerate EFI variables, and trying them all is too slow.
+			// BootOrder + BootCurrent + the first 0xff entries should be enough.
+			foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xff).Select(i => (UInt16) i))) {
+				var entry = GetVariable(String.Format("Boot{0:X04}", num));
+				if (entry.Data != null) {
+					Setup.Log($"LogBootOrder: {entry}");
+				}
+			}
+		} catch (Exception e) {
+			Setup.Log($"LogBootOrder failed: {e.ToString()}");
+		}
+	}
+
+	/**
+	 * Retrieve HackBGRT log collected during boot.
+	 */
+	public static string GetHackBGRTLog() {
+		try {
+			var log = GetVariable("HackBGRTLog", EFI_HACKBGRT_GUID);
+			return new string(BytesToUInt16s(log.Data).Select(i => (char)i).ToArray());
+		} catch (Exception e) {
+			return $"Log not found: {e.ToString()}";
+		}
+	}
+
+	/**
 	 * Log the BGRT table (for debugging).
 	 */
 	public static void LogBGRT() {
@@ -456,14 +505,14 @@ public class Efi {
 			var ret = GetSystemFirmwareTable(acpiBE, bgrtLE, buf, size);
 			if (ret == size) {
 				var hex = BitConverter.ToString(buf).Replace("-", " ");
-				Setup.Log($"LogBGRT: {hex}");
+				Setup.Log($"LogBGRT: {size} bytes: {hex}");
 			} else if (ret == 0) {
 				Setup.Log($"LogBGRT: Win32Error {Marshal.GetLastWin32Error()}");
 			} else {
 				Setup.Log($"LogBGRT: Size problems: spec {0x38}, buf {size}, ret {ret}");
 			}
 		} catch (Exception e) {
-			Setup.Log($"LogBGRT: {e}");
+			Setup.Log($"LogBGRT failed: {e}");
 		}
 	}
 }

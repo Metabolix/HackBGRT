@@ -10,6 +10,8 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
+using System.Management;
+using Microsoft.Win32;
 
 [assembly: AssemblyInformationalVersionAttribute(GIT_DESCRIBE.data)]
 [assembly: AssemblyProductAttribute("HackBGRT")]
@@ -51,6 +53,7 @@ public class Setup {
 	public enum BootLoaderType {
 		None,
 		Own,
+		Shim,
 		Microsoft,
 		Other,
 	}
@@ -61,12 +64,14 @@ public class Setup {
 		"allow-secure-boot",
 		"allow-bitlocker",
 		"allow-bad-loader",
+		"skip-shim",
 		"enable-entry", "disable-entry",
 		"enable-bcdedit", "disable-bcdedit",
 		"enable-overwrite", "disable-overwrite",
 		"disable",
 		"uninstall",
 		"boot-to-fw",
+		"show-boot-log",
 	};
 
 	/** @var The target directory. */
@@ -93,6 +98,9 @@ public class Setup {
 
 	/** @var Run in batch mode? */
 	protected bool Batch;
+
+	/** @var Is the loader signed? */
+	protected bool LoaderIsSigned = false;
 
 	/**
 	 * Output a line.
@@ -204,6 +212,8 @@ public class Setup {
 			string tmp = System.Text.Encoding.ASCII.GetString(data);
 			if (tmp.IndexOf("HackBGRT") >= 0 || tmp.IndexOf("HackBgrt") >= 0) {
 				return BootLoaderType.Own;
+			} else if (tmp.IndexOf("UEFI shim") >= 0) {
+				return BootLoaderType.Shim;
 			} else if (tmp.IndexOf("Microsoft Corporation") >= 0) {
 				return BootLoaderType.Microsoft;
 			} else {
@@ -307,10 +317,28 @@ public class Setup {
 
 	/**
 	 * Install files to ESP.
+	 *
+	 * @param skipShim Whether to skip installing shim.
 	 */
-	protected void InstallFiles() {
-		if (!File.Exists($"boot{EfiArch}.efi")) {
-			throw new SetupException($"Missing boot{EfiArch}.efi, {EfiArch} is not supported!");
+	protected void InstallFiles(bool skipShim) {
+		var loaderSource = Path.Combine("efi-signed", $"boot{EfiArch}.efi");
+		LoaderIsSigned = true;
+		if (!File.Exists(loaderSource)) {
+			loaderSource = Path.Combine("efi", $"boot{EfiArch}.efi");
+			LoaderIsSigned = false;
+			if (!File.Exists(loaderSource)) {
+				throw new SetupException($"Missing boot{EfiArch}.efi, {EfiArch} is not supported!");
+			}
+		}
+		var shimSource = Path.Combine("shim-signed", $"shim{EfiArch}.efi");
+		var mmSource = Path.Combine("shim-signed", $"mm{EfiArch}.efi");
+		if (!skipShim) {
+			if (!File.Exists(shimSource)) {
+				throw new SetupException($"Missing shim ({shimSource}), can't install shim for {EfiArch}!");
+			}
+			if (!File.Exists(mmSource)) {
+				throw new SetupException($"Missing MokManager ({mmSource}), can't install shim for {EfiArch}!");
+			}
 		}
 		try {
 			if (!Directory.Exists(InstallPath)) {
@@ -330,8 +358,32 @@ public class Setup {
 				InstallImageFile(line.Substring(i + delim.Length));
 			}
 		}
-		InstallFile($"boot{EfiArch}.efi", "loader.efi");
+		var loaderDest = "loader.efi";
+		if (!skipShim) {
+			InstallFile(shimSource, loaderDest);
+			InstallFile(mmSource, $"mm{EfiArch}.efi");
+			loaderDest = $"grub{EfiArch}.efi";
+		}
+		InstallFile(loaderSource, loaderDest);
+		if (LoaderIsSigned) {
+			InstallFile("certificate.cer");
+		}
 		WriteLine($"HackBGRT has been copied to {InstallPath}.");
+
+		var enrollHashPath = $"EFI\\HackBGRT\\{loaderDest}";
+		var enrollKeyPath = "EFI\\HackBGRT\\certificate.cer";
+		if (skipShim) {
+			if (LoaderIsSigned) {
+				WriteLine($"Remember to enroll {enrollKeyPath} in your firmware!");
+			} else {
+				WriteLine("This HackBGRT build is not signed. You may need to disable Secure Boot.");
+			}
+		} else {
+			WriteLine($"On first boot, select 'Enroll hash from disk' and enroll {enrollHashPath}.");
+			if (LoaderIsSigned) {
+				WriteLine($"Alternatively, select 'Enroll key from disk' and enroll {enrollKeyPath}.");
+			}
+		}
 	}
 
 	/**
@@ -405,7 +457,6 @@ public class Setup {
 	protected void OverwriteMsLoader() {
 		var ms = Esp.MsLoaderPath;
 		var backup = BackupLoaderPath;
-		var own = Path.Combine(InstallPath, "loader.efi");
 
 		if (DetectLoader(ms) == BootLoaderType.Microsoft) {
 			InstallFile(ms, backup, false);
@@ -414,8 +465,13 @@ public class Setup {
 			// Duplicate check, but better to be sure...
 			throw new SetupException("Missing MS boot loader backup!");
 		}
+		var msDir = Path.GetDirectoryName(ms);
+		var msGrub = Path.Combine(msDir, $"grub{EfiArch}.efi");
+		var msMm = Path.Combine(msDir, $"mm{EfiArch}.efi");
 		try {
-			InstallFile(own, ms, false);
+			InstallFile(Path.Combine(InstallPath, "loader.efi"), ms, false);
+			InstallFile(Path.Combine(InstallPath, $"grub{EfiArch}.efi"), msGrub, false);
+			InstallFile(Path.Combine(InstallPath, $"mm{EfiArch}.efi"), msMm, false);
 		} catch (SetupException e) {
 			WriteLine(e.Message);
 			if (DetectLoader(ms) != BootLoaderType.Microsoft) {
@@ -434,7 +490,7 @@ public class Setup {
 	 */
 	protected void RestoreMsLoader() {
 		var ms = Esp.MsLoaderPath;
-		if (DetectLoader(ms) == BootLoaderType.Own) {
+		if (DetectLoader(ms) == BootLoaderType.Own || DetectLoader(ms) == BootLoaderType.Shim) {
 			WriteLine("Disabling an old version of HackBGRT.");
 			InstallFile(BackupLoaderPath, ms, false);
 			WriteLine($"{ms} has been restored.");
@@ -538,6 +594,9 @@ public class Setup {
 				WriteLine("Secure Boot status could not be determined.");
 			}
 			WriteLine("It's very important to disable Secure Boot before installing.");
+			if (LoaderIsSigned) {
+				WriteLine("Alternatively, you can enroll the certificate.cer in your firmware.");
+			}
 			WriteLine("Otherwise your machine may become unbootable.");
 			if (Batch) {
 				if (allowSecureBoot) {
@@ -675,6 +734,40 @@ public class Setup {
 	}
 
 	/**
+	 * Log the boot time.
+	 *
+	 * @return The boot time, or null if it couldn't be determined.
+	 */
+	protected DateTime? GetBootTime() {
+		try {
+			var query = new ObjectQuery("SELECT LastBootUpTime FROM Win32_OperatingSystem WHERE Primary='true'");
+			foreach (var m in new ManagementObjectSearcher(query).Get()) {
+				return ManagementDateTimeConverter.ToDateTime(m["LastBootUpTime"].ToString());
+			}
+		} catch (Exception e) {
+			Log($"GetBootTime failed: {e.ToString()}");
+		}
+		return null;
+	}
+
+	/**
+	 * Check if Hiberboot is enabled.
+	 *
+	 * @return True, if Hiberboot is enabled.
+	 */
+	protected bool IsHiberbootEnabled() {
+		try {
+			return (int) Registry.GetValue(
+				"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power",
+				"HiberbootEnabled",
+				0
+			) != 0;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
 	 * Ask for user's choice and install/uninstall.
 	 */
 	protected void ShowMenu() {
@@ -682,19 +775,14 @@ public class Setup {
 		WriteLine("Choose action (press a key):");
 		WriteLine(" I = install");
 		WriteLine("     - creates a new EFI boot entry for HackBGRT");
-		WriteLine("     - sometimes needs to be enabled in firmware settings");
-		WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
 		WriteLine(" J = install (alternative)");
 		WriteLine("     - creates a new EFI boot entry with an alternative method (BCDEdit)");
-		WriteLine("     - always sets HackBGRT as the first boot option");
-		WriteLine("     - sometimes shows up as \"Windows Boot Manager\"");
-		WriteLine("     - should fall back to MS boot loader if HackBGRT fails");
+		WriteLine("     - try this if the first option doesn't work");
 		WriteLine(" O = install (legacy)");
-		WriteLine("     - overwrites the MS boot loader");
-		WriteLine("     - may require re-install after Windows updates");
-		WriteLine("     - could brick your system if configured incorrectly");
+		WriteLine("     - overwrites the MS boot loader; gets removed by Windows updates");
+		WriteLine("     - use as last resort; may brick your system if configured incorrectly");
 		WriteLine(" F = install files only");
-		WriteLine("     - needs to be enabled somehow");
+		WriteLine("     - ok for updating config, doesn't touch boot entries");
 		WriteLine(" D = disable");
 		WriteLine("     - removes created entries, restores MS boot loader");
 		WriteLine(" R = remove completely");
@@ -702,6 +790,7 @@ public class Setup {
 		WriteLine(" B = boot to UEFI setup");
 		WriteLine("     - lets you disable Secure Boot");
 		WriteLine("     - lets you move HackBGRT before Windows in boot order");
+		WriteLine(" L = show boot log (what HackBGRT did during boot)");
 		WriteLine(" C = cancel");
 
 		var k = Console.ReadKey().Key;
@@ -724,6 +813,8 @@ public class Setup {
 			RunPrivilegedActions(new string[] { "uninstall" });
 		} else if (k == ConsoleKey.B) {
 			RunPrivilegedActions(new string[] { "boot-to-fw" });
+		} else if (k == ConsoleKey.L) {
+			RunPrivilegedActions(new string[] { "show-boot-log" });
 		} else if (k == ConsoleKey.C) {
 			throw new ExitSetup(1);
 		} else {
@@ -757,10 +848,24 @@ public class Setup {
 
 		InitEspPath();
 		InitEspInfo();
+		var bootLog = $"\n--- BOOT LOG START ---\n{Efi.GetHackBGRTLog()}\n--- BOOT LOG END ---";
+		Setup.Log(bootLog);
 		Efi.LogBGRT();
+		Efi.LogBootEntries();
+		if (GetBootTime() is DateTime bootTime) {
+			var configTime = new[] { File.GetCreationTime("config.txt"), File.GetLastWriteTime("config.txt") }.Max();
+			Log($"Boot time = {bootTime}, config.txt changed = {configTime}");
+			if (configTime > bootTime) {
+				WriteLine($"Windows was booted at {bootTime}. Remember to reboot after installing!");
+			}
+		}
+		if (IsHiberbootEnabled()) {
+			WriteLine("You may have to disable Fast Startup (Hiberboot) to reboot properly.");
+		}
 		bool allowSecureBoot = false;
 		bool allowBitLocker = false;
 		bool allowBadLoader = false;
+		bool skipShim = false;
 		Action<Action> verify = (Action revert) => {
 			try {
 				VerifyLoaderConfig();
@@ -776,7 +881,9 @@ public class Setup {
 			}
 		};
 		Action<Action, Action> enable = (Action enable, Action revert) => {
-			HandleSecureBoot(allowSecureBoot);
+			if (skipShim) {
+				HandleSecureBoot(allowSecureBoot);
+			}
 			HandleBitLocker(allowBitLocker);
 			enable();
 			verify(revert);
@@ -784,13 +891,15 @@ public class Setup {
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
 			if (arg == "install") {
-				InstallFiles();
+				InstallFiles(skipShim);
 			} else if (arg == "allow-secure-boot") {
 				allowSecureBoot = true;
 			} else if (arg == "allow-bitlocker") {
 				allowBitLocker = true;
 			} else if (arg == "allow-bad-loader") {
 				allowBadLoader = true;
+			} else if (arg == "skip-shim") {
+				skipShim = true;
 			} else if (arg == "enable-entry") {
 				enable(() => EnableEntry(), () => DisableEntry());
 			} else if (arg == "disable-entry") {
@@ -809,6 +918,8 @@ public class Setup {
 				Uninstall();
 			} else if (arg == "boot-to-fw") {
 				BootToFW();
+			} else if (arg == "show-boot-log") {
+				WriteLine(bootLog);
 			} else {
 				throw new SetupException($"Invalid action: '{arg}'!");
 			}
@@ -874,7 +985,7 @@ public class Setup {
 				WriteLine("This was a dry run, your system was not actually modified.");
 			}
 			if (!Batch) {
-				WriteLine("If you need to report a bug, please include the setup.log file.");
+				WriteLine("If you need to report a bug,\n - run this setup again with menu option L (show-boot-log)\n - then include the setup.log file with your report.");
 				WriteLine("Press any key to quit.");
 				Console.ReadKey();
 			}
