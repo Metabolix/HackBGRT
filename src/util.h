@@ -14,7 +14,17 @@ extern const CHAR16* TmpStr(CHAR8 *src, int length);
 /**
  * Empty function that has the same signature as Print.
  */
-extern UINTN NullPrint(IN CONST CHAR16 *fmt, ...);
+extern void Log(int print, IN CONST CHAR16 *fmt, ...);
+
+/**
+ * Dump the log buffer to the screen.
+ */
+extern void DumpLog(void);
+
+/**
+ * Clear the log EFI variable, for minor RAM savings.
+ */
+extern void ClearLogVariable(void);
 
 /**
  * Return the greater of two numbers.

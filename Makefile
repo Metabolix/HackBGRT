@@ -4,7 +4,7 @@ CROSS_COMPILE =
 # PREFIX=/usr/local/
 PREFIX = ./gnu-efi/usr/local/
 TARGET = HackBGRT_MULTI_$(ARCH)
-_OBJS = main.o config.o types.o util.o
+_OBJS = main.o config.o types.o util.o sbat.o
 _OBJS += picojpeg.o
 _OBJS += upng.o
 _OBJS += my_efilib.o
@@ -38,7 +38,7 @@ CFLAGS = -std=c11 -O2 -ffreestanding -mno-red-zone -fno-stack-protector \
 	-fno-merge-all-constants -fno-stack-check
 # -Werror
 GIT_DESCRIBE = $(firstword $(shell git describe --tags) unknown)
-CFLAGS += '-DGIT_DESCRIBE=L"$(GIT_DESCRIBE)"'
+CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)"'
 
 # LDFLAGS
 LDFLAGS = -nostdlib --warn-common --no-undefined \
@@ -47,6 +47,9 @@ LDFLAGS = -nostdlib --warn-common --no-undefined \
 # set EFI_SUBSYSTEM: Application(0x0a)
 LDFLAGS += --defsym=EFI_SUBSYSTEM=0x0a
 LDFLAGS += -L$(PREFIX)/lib
+# ld: warning: ./gnu-efi/usr/local//lib/crt0-efi-x86_64.o: missing .note.GNU-stack section implies executable stack
+# ld: NOTE: This behaviour is deprecated and will be removed in a future version of the linker
+LDFLAGS += -z noexecstack
 
 
 ####### rules #########

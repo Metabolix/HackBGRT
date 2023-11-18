@@ -69,18 +69,24 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 **Important:** If you mess up the installation, your system may become unbootable! Create a rescue disk before use. This software comes with no warranty. Use at your own risk.
 
 * Make sure that your computer is booting with UEFI.
-* Make sure that Secure Boot is disabled, unless you know how to sign EFI applications.
+* Make sure that you have read the Secure Boot instructions.
 * Make sure that BitLocker is disabled, or find your recovery key.
+
+### Secure Boot instructions
+
+HackBGRT is not approved by Microsoft. Instead, HackBGRT comes with the *shim* boot loader, which allows to manually select HackBGRT as a trusted program. After installing HackBGRT and rebooting your computer, you have to **follow the instructions in [shim.md](shim.md)** to achieve this. These steps cannot be automated, that's the whole point of Secure Boot. Although HackBGRT is self-signed with a certificate, it's not advisable to enroll foreign certificates directly into your firmware.
+
+The *shim* boot loader is maintained by Red Hat, Inc, and the included signed copy of *shim* is extracted from Debian GNU/Linux – many thanks to the maintainers! For copyright information, see [shim-signed/COPYRIGHT](shim-signed/COPYRIGHT).
 
 ### Windows installation
 
 * Get the latest release from the Releases page.
 * Start `setup.exe` and follow the instructions.
-	* You may need to manually disable Secure Boot and then retry.
 	* The installer will launch Paint for editing the image.
 	* If Windows later restores the original boot loader, just reinstall.
 	* If you wish to change the image or other configuration, just reinstall.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
+	* After installing, read the instructions in [shim.md](shim.md) and reboot your computer.
 
 ### Quiet (batch) installation
 
@@ -93,11 +99,13 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 	* `disable-bootmgr` – use `bcdedit` to disable the EFI boot entry.
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
+	* `skip-shim` – skip *shim* when installing.
 	* `allow-secure-boot` – ignore Secure Boot in subsequent commands.
 	* `allow-bitlocker` – ignore BitLocker in subsequent commands.
 	* `allow-bad-loader` – ignore bad boot loader configuration in subsequent commands.
 	* `disable` – run all relevant `disable-*` commands.
 	* `uninstall` – disable and remove completely.
+	* `show-boot-log` – show the debug log collected during boot (if `log=1` is set in `config.txt`).
 * For example, run `setup.exe batch install allow-secure-boot enable-overwrite` to copy files and overwrite the MS boot loader regardless of Secure Boot status.
 
 ### Multi-boot configurations

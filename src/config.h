@@ -21,7 +21,7 @@ enum HackBGRT_coordinate {
  * The configuration.
  */
 struct HackBGRT_config {
-	int debug;
+	int debug, log;
 	enum HackBGRT_action action;
 	const CHAR16* image_path;
 	int image_x;
