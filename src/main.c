@@ -28,8 +28,7 @@ static struct HackBGRT_config config = {
 static EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP(void) {
 	static EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
 	if (!gop) {
-		EFI_GUID GraphicsOutputProtocolGuid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
-		LibLocateProtocol(&GraphicsOutputProtocolGuid, (VOID **)&gop);
+		LibLocateProtocol(TmpGuidPtr((EFI_GUID) EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID), (void**) &gop);
 	}
 	return gop;
 }
@@ -130,9 +129,8 @@ ACPI_SDT_HEADER* CreateXsdt(ACPI_SDT_HEADER* xsdt0, UINTN entries) {
  */
 static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt) {
 	for (int i = 0; i < ST->NumberOfTableEntries; i++) {
-		EFI_GUID Acpi20TableGuid = ACPI_20_TABLE_GUID;
 		EFI_GUID* vendor_guid = &ST->ConfigurationTable[i].VendorGuid;
-		if (!CompareGuid(vendor_guid, &AcpiTableGuid) && !CompareGuid(vendor_guid, &Acpi20TableGuid)) {
+		if (CompareMem(vendor_guid, TmpGuidPtr((EFI_GUID) ACPI_TABLE_GUID), sizeof(EFI_GUID)) != 0 && CompareMem(vendor_guid, TmpGuidPtr((EFI_GUID) ACPI_20_TABLE_GUID), sizeof(EFI_GUID)) != 0) {
 			continue;
 		}
 		ACPI_20_RSDP* rsdp = (ACPI_20_RSDP *) ST->ConfigurationTable[i].VendorTable;
@@ -411,7 +409,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	Log(0, L"HackBGRT version: %s\n", version);
 
 	EFI_LOADED_IMAGE* image;
-	if (EFI_ERROR(BS->HandleProtocol(image_handle, &LoadedImageProtocol, (void**) &image))) {
+	if (EFI_ERROR(BS->HandleProtocol(image_handle, TmpGuidPtr((EFI_GUID) EFI_LOADED_IMAGE_PROTOCOL_GUID), (void**) &image))) {
 		Log(config.debug, L"HackBGRT: LOADED_IMAGE_PROTOCOL failed.\n");
 		goto fail;
 	}

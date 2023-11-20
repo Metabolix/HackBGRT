@@ -120,3 +120,11 @@ static inline void* LoadFile(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* siz
 	return LoadFileWithPadding(dir, path, size_ptr, 0);
 }
 
+/**
+ * Get a temporary pointer to GUID.
+ */
+static inline EFI_GUID* TmpGuidPtr(EFI_GUID guid) {
+	static EFI_GUID g;
+	g = guid;
+	return &g;
+}
