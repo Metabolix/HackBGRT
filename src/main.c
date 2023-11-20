@@ -426,19 +426,21 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 
-	CHAR16 **argv;
-	int argc = GetShellArgcArgv(image_handle, &argv);
-
-	if (argc <= 1) {
+	EFI_SHELL_PARAMETERS_PROTOCOL *shell_param_proto = NULL;
+	if (EFI_ERROR(BS->OpenProtocol(image_handle, TmpGuidPtr((EFI_GUID) EFI_SHELL_PARAMETERS_PROTOCOL_GUID), (void**) &shell_param_proto, 0, 0, EFI_OPEN_PROTOCOL_GET_PROTOCOL)) || shell_param_proto->Argc <= 1) {
 		const CHAR16* config_path = L"\\EFI\\HackBGRT\\config.txt";
 		if (!ReadConfigFile(&config, root_dir, config_path)) {
 			Log(1, L"HackBGRT: No config, no command line!\n", config_path);
 			goto fail;
 		}
+	} else {
+		CHAR16 **argv = shell_param_proto->Argv;
+		int argc = shell_param_proto->Argc;
+		for (int i = 1; i < argc; ++i) {
+			ReadConfigLine(&config, root_dir, argv[i]);
+		}
 	}
-	for (int i = 1; i < argc; ++i) {
-		ReadConfigLine(&config, root_dir, argv[i]);
-	}
+
 	if (config.debug) {
 		Log(-1, L"HackBGRT version: %s\n", version);
 	}
