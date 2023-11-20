@@ -247,7 +247,14 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	UINTN size = 0;
 	BMP* bmp = LoadFile(root_dir, path, &size);
 	if (bmp) {
-		if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
+		if (size >= bmp->file_size
+		&& CompareMem(bmp, "BM", 2) == 0
+		&& bmp->file_size > bmp->pixel_data_offset
+		&& bmp->width > 0
+		&& bmp->height > 0
+		&& (bmp->bpp == 32 || bmp->bpp == 24)
+		&& bmp->height * (-(-(bmp->width * (bmp->bpp / 8)) & ~3)) <= bmp->file_size - bmp->pixel_data_offset
+		&& bmp->compression == 0) {
 			return bmp;
 		}
 		FreePool(bmp);
@@ -271,8 +278,6 @@ static void CropBMP(BMP* bmp, int w, int h) {
 	bmp->image_size = 0;
 	bmp->width = min(bmp->width, w);
 	bmp->height = min(bmp->height, h);
-	const int h_max = (bmp->file_size - bmp->pixel_data_offset) / old_pitch;
-	bmp->height = min(bmp->height, h_max);
 	const int new_pitch = -(-(bmp->width * (bmp->bpp / 8)) & ~3);
 
 	if (new_pitch < old_pitch) {
