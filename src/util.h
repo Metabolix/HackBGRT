@@ -12,9 +12,12 @@
 extern const CHAR16* TmpStr(CHAR8 *src, int length);
 
 /**
- * Empty function that has the same signature as Print.
+ * Print or log a string.
+ *
+ * @param mode -1 = print without logging, 0 = no, 1 = yes.
+ * @param fmt The format string. Supports %d, %x, %s.
  */
-extern void Log(int print, IN CONST CHAR16 *fmt, ...);
+extern void Log(int mode, IN CONST CHAR16 *fmt, ...);
 
 /**
  * Dump the log buffer to the screen.

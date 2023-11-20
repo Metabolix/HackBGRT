@@ -432,7 +432,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		ReadConfigLine(&config, root_dir, argv[i]);
 	}
 	if (config.debug) {
-		Print(L"HackBGRT version: %s\n", version);
+		Log(-1, L"HackBGRT version: %s\n", version);
 	}
 
 	SetResolution(config.resolution_x, config.resolution_y);
@@ -461,14 +461,14 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 			goto ready_to_boot;
 		}
 		Log(1, L"HackBGRT: Reverting to %s.\n", config.boot_path);
-		Print(L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
+		Log(-1, L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
 		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			goto fail;
 		}
 	} else ready_to_boot: if (config.debug) {
-		Print(L"HackBGRT: Ready to boot.\n");
-		Print(L"If all goes well, you can set debug=0 and log=0 in config.txt.\n");
-		Print(L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
+		Log(-1, L"HackBGRT: Ready to boot.\n");
+		Log(-1, L"If all goes well, you can set debug=0 and log=0 in config.txt.\n");
+		Log(-1, L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
 		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			return 0;
 		}
@@ -481,15 +481,15 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 	Log(1, L"HackBGRT: Started %s. Why are we still here?!\n", config.boot_path);
-	Print(L"Please check that %s is not actually HackBGRT!\n", config.boot_path);
+	Log(-1, L"Please check that %s is not actually HackBGRT!\n", config.boot_path);
 	goto fail;
 
 	fail: {
 		Log(1, L"HackBGRT has failed.\n");
-		Print(L"Dumping log:\n\n");
+		Log(-1, L"Dumping log:\n\n");
 		DumpLog();
-		Print(L"If you can't boot into Windows, get install/recovery disk to fix your boot.\n");
-		Print(L"Press any key (or wait 15 seconds) to exit.\n");
+		Log(-1, L"If you can't boot into Windows, get install/recovery disk to fix your boot.\n");
+		Log(-1, L"Press any key (or wait 15 seconds) to exit.\n");
 		ReadKey(15000);
 		return 1;
 	}

@@ -74,7 +74,7 @@ static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum Ha
 	config->image_weight_sum += weight;
 	UINT32 random = Random();
 	UINT32 limit = 0xfffffffful / config->image_weight_sum * weight;
-	Log(config->debug, L"HackBGRT: n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, random = %08x, limit = %08x\n", weight, action, x, y, o, path, random, limit);
+	Log(config->debug, L"HackBGRT: n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, random = %x, limit = %x\n", weight, action, x, y, o, path, random, limit);
 	if (!config->image_weight_sum || random <= limit) {
 		config->action = action;
 		config->image_path = path;
