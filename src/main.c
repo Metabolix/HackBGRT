@@ -1,6 +1,4 @@
-#include <efi.h>
-#include <efilib.h>
-
+#include "efi.h"
 #include "types.h"
 #include "config.h"
 #include "util.h"
@@ -13,6 +11,10 @@
 #else
 	const CHAR16 version[] = L"unknown; not an official release?";
 #endif
+
+EFI_SYSTEM_TABLE *ST;
+EFI_BOOT_SERVICES *BS;
+EFI_RUNTIME_SERVICES *RT;
 
 /**
  * The configuration.
@@ -404,8 +406,11 @@ static EFI_HANDLE LoadApp(int print_failure, EFI_HANDLE image_handle, EFI_LOADED
 /**
  * The main program.
  */
-EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
-	InitializeLib(image_handle, ST_);
+EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
+	ST = ST_;
+	BS = ST_->BootServices;
+	RT = ST_->RuntimeServices;
+
 	Log(0, L"HackBGRT version: %s\n", version);
 
 	EFI_LOADED_IMAGE* image;
@@ -503,13 +508,4 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		ReadKey(15000);
 		return 1;
 	}
-}
-
-/**
- * Forward to EfiMain.
- *
- * Some compilers and architectures differ in underscore handling. This helps.
- */
-EFI_STATUS EFIAPI _EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
-	return EfiMain(image_handle, ST_);
 }

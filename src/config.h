@@ -1,6 +1,6 @@
 #pragma once
 
-#include <efi.h>
+#include "efi.h"
 
 /**
  * Possible actions to perform on the BGRT.

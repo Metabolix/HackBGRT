@@ -1,6 +1,6 @@
 #pragma once
 
-#include <efi.h>
+#include "efi.h"
 
 #pragma pack(push, 1)
 

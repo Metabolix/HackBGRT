@@ -1,7 +1,5 @@
 #include "util.h"
 
-#include <efilib.h>
-
 const CHAR16* TmpStr(CHAR8 *src, int length) {
 	static CHAR16 arr[4][16];
 	static int j;

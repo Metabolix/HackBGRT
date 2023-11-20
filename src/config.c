@@ -1,8 +1,6 @@
 #include "config.h"
 #include "util.h"
 
-#include <efilib.h>
-
 BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	void* data = 0;
 	UINTN data_bytes = 0;

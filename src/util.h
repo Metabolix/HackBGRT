@@ -1,6 +1,6 @@
 #pragma once
 
-#include <efi.h>
+#include "efi.h"
 
 /**
  * Convert a short ASCII string to UCS2, store in a static array.
