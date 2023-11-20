@@ -84,6 +84,6 @@ If something breaks and you can't boot to Windows, you need to use the Windows i
 
 ## Building
 
-* Compiler: GCC targeting w64-mingw32
+* Compiler: Clang
 * Compiler flags: see Makefile
 * Libraries: gnu-efi

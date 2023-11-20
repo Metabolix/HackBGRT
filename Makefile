@@ -1,9 +1,10 @@
-CC      = $(CC_PREFIX)-gcc
-CFLAGS  = -std=c11 -O2 -ffreestanding -mno-red-zone -fno-stack-protector -Wshadow -Wall -Wunused -Werror-implicit-function-declaration -Werror
+CC = clang
+CFLAGS = -target $(CLANG_TARGET) -ffreestanding -fshort-wchar -mno-red-zone
+CFLAGS += -std=c17 -O2 -Wshadow -Wall -Wunused -Werror-implicit-function-declaration
 CFLAGS += -I$(GNUEFI_INC) -I$(GNUEFI_INC)/$(GNUEFI_ARCH) -I$(GNUEFI_INC)/protocol
-LDFLAGS = -nostdlib -shared -Wl,-dll -Wl,--subsystem,10 -e efi_main -s
+LDFLAGS = -target $(CLANG_TARGET) -nostdlib -Wl,-entry:efi_main -Wl,-subsystem:efi_application -fuse-ld=lld
 
-GNUEFI_INC = /usr/$(CC_PREFIX)/include/efi
+GNUEFI_INC = gnu-efi/inc
 
 FILES_C = src/main.c src/util.c src/types.c src/config.c src/sbat.c src/efi.c
 FILES_H = $(wildcard src/*.h)
@@ -13,11 +14,13 @@ CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
 ZIP = $(ZIPDIR).zip
 
+EFI_ARCH_LIST = x64 ia32
+
 .PHONY: all efi efi-signed setup zip clean
 
 all: efi setup
-efi: efi/bootx64.efi efi/bootia32.efi
-efi-signed: efi-signed/bootx64.efi efi-signed/bootia32.efi
+efi: $(patsubst %,efi/boot%.efi,$(EFI_ARCH_LIST))
+efi-signed: $(patsubst %,efi-signed/boot%.efi,$(EFI_ARCH_LIST))
 setup: setup.exe
 
 zip: $(ZIP)
@@ -53,16 +56,16 @@ efi-signed/%.efi: efi/%.efi
 efi-signed/bootx64.efi: pki
 efi-signed/bootia32.efi: pki
 
-efi/bootx64.efi: CC_PREFIX = x86_64-w64-mingw32
+efi/bootx64.efi: CLANG_TARGET = x86_64-pc-windows-msvc
 efi/bootx64.efi: GNUEFI_ARCH = x86_64
 efi/bootx64.efi: $(FILES_C)
 	@mkdir -p efi
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-efi/bootia32.efi: CC_PREFIX = i686-w64-mingw32
+efi/bootia32.efi: CLANG_TARGET = i386-pc-windows-msvc
 efi/bootia32.efi: GNUEFI_ARCH = ia32
 efi/bootia32.efi: $(FILES_C)
-	@mkdir -p efi
+	@mkdir -p build
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 clean:
