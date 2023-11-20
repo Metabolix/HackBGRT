@@ -64,12 +64,12 @@ static void SetResolution(int w, int h) {
 			continue;
 		}
 		if (info_size < sizeof(*info)) {
-			FreePool(info);
+			BS->FreePool(info);
 			continue;
 		}
 		new_w = info->HorizontalResolution;
 		new_h = info->VerticalResolution;
-		FreePool(info);
+		BS->FreePool(info);
 
 		// Sum of missing w/h should be minimal.
 		int new_missing = max(w - new_w, 0) + max(h - new_h, 0);
@@ -110,8 +110,8 @@ ACPI_SDT_HEADER* CreateXsdt(ACPI_SDT_HEADER* xsdt0, UINTN entries) {
 		Log(1, L"HackBGRT: Failed to allocate memory for XSDT.\n");
 		return 0;
 	}
-	ZeroMem(xsdt, xsdt_len);
-	CopyMem(xsdt, xsdt0, min(xsdt0->length, xsdt_len));
+	BS->SetMem(xsdt, xsdt_len, 0);
+	BS->CopyMem(xsdt, xsdt0, min(xsdt0->length, xsdt_len));
 	xsdt->length = xsdt_len;
 	SetAcpiSdtChecksum(xsdt);
 	return xsdt;
@@ -257,7 +257,7 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 		&& bmp->compression == 0) {
 			return bmp;
 		}
-		FreePool(bmp);
+		BS->FreePool(bmp);
 		Log(1, L"HackBGRT: Invalid BMP (%s)!\n", path);
 	} else {
 		Log(1, L"HackBGRT: Failed to load BMP (%s)!\n", path);
@@ -282,7 +282,7 @@ static void CropBMP(BMP* bmp, int w, int h) {
 
 	if (new_pitch < old_pitch) {
 		for (int i = 1; i < bmp->height; ++i) {
-			CopyMem(
+			BS->CopyMem(
 				(UINT8*) bmp + bmp->pixel_data_offset + i * new_pitch,
 				(UINT8*) bmp + bmp->pixel_data_offset + i * old_pitch,
 				new_pitch

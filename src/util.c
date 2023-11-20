@@ -181,9 +181,11 @@ void* LoadFileWithPadding(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* size_p
 		return 0;
 	}
 
-	EFI_FILE_INFO *info = LibFileInfo(handle);
-	UINTN size = info->FileSize;
-	FreePool(info);
+	UINT64 get_size = 0;
+	handle->SetPosition(handle, ~(UINT64)0);
+	handle->GetPosition(handle, &get_size);
+	handle->SetPosition(handle, 0);
+	UINTN size = (UINTN) get_size;
 
 	void* data = 0;
 	e = BS->AllocatePool(EfiBootServicesData, size + padding, &data);
@@ -197,7 +199,7 @@ void* LoadFileWithPadding(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* size_p
 	}
 	handle->Close(handle);
 	if (EFI_ERROR(e)) {
-		FreePool(data);
+		BS->FreePool(data);
 		return 0;
 	}
 	if (size_ptr) {
