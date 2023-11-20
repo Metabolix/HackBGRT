@@ -162,7 +162,19 @@ void RandomSeedAuto(void) {
 EFI_STATUS WaitKey(UINT64 timeout_ms) {
 	ST->ConIn->Reset(ST->ConIn, FALSE);
 	const int ms_to_100ns = 10000;
-	return WaitForSingleEvent(ST->ConIn->WaitForKey, timeout_ms * ms_to_100ns);
+
+	EFI_EVENT events[2] = {ST->ConIn->WaitForKey};
+	EFI_STATUS status = BS->CreateEvent(EVT_TIMER, 0, NULL, NULL, &events[1]);
+	if (!EFI_ERROR(status)) {
+		BS->SetTimer(events[1], TimerRelative, timeout_ms * ms_to_100ns);
+		UINTN index;
+		status = BS->WaitForEvent(2, events, &index);
+		BS->CloseEvent(events[1]);
+		if (!EFI_ERROR(status) && index == 1) {
+			status = EFI_TIMEOUT;
+		}
+	}
+	return status;
 }
 
 EFI_INPUT_KEY ReadKey(UINT64 timeout_ms) {
