@@ -414,7 +414,17 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 
-	EFI_FILE_HANDLE root_dir = LibOpenRoot(image->DeviceHandle);
+	EFI_FILE_IO_INTERFACE* io;
+	if (EFI_ERROR(BS->HandleProtocol(image->DeviceHandle, TmpGuidPtr((EFI_GUID) EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID), (void**) &io))) {
+		Log(config.debug, L"HackBGRT: FILE_SYSTEM_PROTOCOL failed.\n");
+		goto fail;
+	}
+
+	EFI_FILE_HANDLE root_dir;
+	if (EFI_ERROR(io->OpenVolume(io, &root_dir))) {
+		Log(config.debug, L"HackBGRT: Failed to open root directory.\n");
+		goto fail;
+	}
 
 	CHAR16 **argv;
 	int argc = GetShellArgcArgv(image_handle, &argv);
