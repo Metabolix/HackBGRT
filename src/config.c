@@ -70,8 +70,8 @@ BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir,
 
 static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum HackBGRT_action action, int x, int y, int o, const CHAR16* path) {
 	config->image_weight_sum += weight;
-	UINT32 random = Random();
-	UINT32 limit = 0xfffffffful / config->image_weight_sum * weight;
+	UINT32 random = (((UINT64) Random() & 0xffffffff) * config->image_weight_sum) >> 32;
+	UINT32 limit = ((UINT64) 0xffffffff * weight) >> 32;
 	Log(config->debug, L"HackBGRT: n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, random = %x, limit = %x\n", weight, action, x, y, o, path, random, limit);
 	if (!config->image_weight_sum || random <= limit) {
 		config->action = action;

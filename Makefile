@@ -14,7 +14,7 @@ CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)
 ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
 ZIP = $(ZIPDIR).zip
 
-EFI_ARCH_LIST = x64 ia32 aa64
+EFI_ARCH_LIST = x64 ia32 aa64 arm
 
 .PHONY: all efi efi-signed setup zip clean
 
@@ -71,6 +71,12 @@ efi/bootia32.efi: $(FILES_C)
 efi/bootaa64.efi: CLANG_TARGET = aarch64-pc-windows-msvc
 efi/bootaa64.efi: GNUEFI_ARCH = aa64
 efi/bootaa64.efi: $(FILES_C)
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
+efi/bootarm.efi: CLANG_TARGET = armv6-pc-windows-msvc
+efi/bootarm.efi: GNUEFI_ARCH = arm
+efi/bootarm.efi: $(FILES_C)
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
