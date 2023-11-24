@@ -1,8 +1,10 @@
 CC = clang
-CFLAGS = -target $(CLANG_TARGET) -ffreestanding -fshort-wchar -mno-red-zone
-CFLAGS += -std=c17 -O2 -Wshadow -Wall -Wunused -Werror-implicit-function-declaration
+CFLAGS = -target $(CLANG_TARGET) -ffreestanding -fshort-wchar
+CFLAGS += -std=c17 -Wshadow -Wall -Wunused -Werror-implicit-function-declaration
 CFLAGS += -I$(GNUEFI_INC) -I$(GNUEFI_INC)/$(GNUEFI_ARCH) -I$(GNUEFI_INC)/protocol
+CFLAGS += $(ARCH_CFLAGS)
 LDFLAGS = -target $(CLANG_TARGET) -nostdlib -Wl,-entry:efi_main -Wl,-subsystem:efi_application -fuse-ld=lld
+ARCH_CFLAGS = -O2 -mno-red-zone
 
 GNUEFI_INC = gnu-efi/inc
 
@@ -58,27 +60,25 @@ efi-signed/bootia32.efi: pki
 
 efi/bootx64.efi: CLANG_TARGET = x86_64-pc-windows-msvc
 efi/bootx64.efi: GNUEFI_ARCH = x86_64
-efi/bootx64.efi: $(FILES_C)
-	@mkdir -p efi
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 efi/bootia32.efi: CLANG_TARGET = i386-pc-windows-msvc
 efi/bootia32.efi: GNUEFI_ARCH = ia32
-efi/bootia32.efi: $(FILES_C)
-	@mkdir -p build
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 efi/bootaa64.efi: CLANG_TARGET = aarch64-pc-windows-msvc
 efi/bootaa64.efi: GNUEFI_ARCH = aa64
-efi/bootaa64.efi: $(FILES_C)
-	@mkdir -p build
+
+efi/boot%.efi: $(FILES_C)
+	@mkdir -p efi
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 efi/bootarm.efi: CLANG_TARGET = armv6-pc-windows-msvc
 efi/bootarm.efi: GNUEFI_ARCH = arm
+efi/bootarm.efi: ARCH_CFLAGS = -O # skip -O2 and -mno-red-zone
 efi/bootarm.efi: $(FILES_C)
-	@mkdir -p build
+	@mkdir -p efi
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	@echo "Fix $@ architecture code (IMAGE_FILE_MACHINE_ARMTHUMB_MIXED = 0x01C2)"
+	echo -en "\xc2\x01" | dd of=$@ bs=1 seek=124 count=2 conv=notrunc status=none
 
 clean:
 	rm -rf setup.exe efi efi-signed
