@@ -23,6 +23,7 @@ EFI_SIGNED_FILES = $(patsubst %,efi-signed/boot%.efi,$(EFI_ARCH_LIST))
 all: efi setup
 	@echo "Run 'make efi-signed' to sign the EFI executables."
 	@echo "Run 'make release' to build a release-ready ZIP archive."
+	@echo "Run 'make run-qemu-<arch>' to test the EFI executables with QEMU."
 
 efi: $(patsubst %,efi/boot%.efi,$(EFI_ARCH_LIST))
 	@echo "EFI executables are in the efi/ directory."
@@ -91,3 +92,31 @@ clean:
 	rm -rf setup.exe efi efi-signed
 	rm -f src/GIT_DESCRIBE.cs
 	rm -rf release
+	rm -rf test
+
+.PHONY: test $(patsubst %,run-qemu-%,$(EFI_ARCH_LIST))
+
+test: run-qemu-x64
+	@echo "Run 'make run-qemu-<arch>' to test other architectures."
+
+test/esp-%: efi/boot%.efi splash.bmp
+	rm -rf $@
+	mkdir -p $@/EFI/HackBGRT
+	cp efi/boot$*.efi splash.bmp $@/EFI/HackBGRT
+	echo -en "FS0:\n cd EFI\n cd HackBGRT\n boot$*.efi resolution=-1x-1 debug=1 image=path=splash.bmp" > $@/startup.nsh
+
+QEMU_ARGS = -bios $(word 2, $^) -net none -drive media=disk,file=fat:rw:./$<,format=raw
+
+run-qemu-x64: test/esp-x64 /usr/share/ovmf/x64/OVMF.fd
+	qemu-system-x86_64 $(QEMU_ARGS)
+
+run-qemu-ia32: test/esp-ia32 /usr/share/ovmf/ia32/OVMF.fd
+	qemu-system-i386 $(QEMU_ARGS)
+
+run-qemu-aa64: test/esp-aa64 /usr/share/ovmf/aarch64/QEMU_EFI.fd
+	@echo "Press Ctrl+Alt+2 to switch to QEMU console."
+	qemu-system-aarch64 -machine virt -cpu max $(QEMU_ARGS)
+
+run-qemu-arm: test/esp-arm /usr/share/ovmf/arm/QEMU_EFI.fd
+	@echo "Press Ctrl+Alt+2 to switch to QEMU console."
+	qemu-system-arm -machine virt -cpu max $(QEMU_ARGS)
