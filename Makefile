@@ -13,31 +13,41 @@ FILES_H = $(wildcard src/*.h)
 FILES_CS = src/Setup.cs src/Esp.cs src/Efi.cs
 GIT_DESCRIBE := $(firstword $(GIT_DESCRIBE) $(shell git describe --tags) unknown)
 CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)"'
-ZIPDIR = HackBGRT-$(GIT_DESCRIBE:v%=%)
-ZIP = $(ZIPDIR).zip
+RELEASE_NAME = HackBGRT-$(GIT_DESCRIBE:v%=%)
 
 EFI_ARCH_LIST = x64 ia32 aa64 arm
+EFI_SIGNED_FILES = $(patsubst %,efi-signed/boot%.efi,$(EFI_ARCH_LIST))
 
-.PHONY: all efi efi-signed setup zip clean
+.PHONY: all efi efi-signed setup release clean
 
 all: efi setup
+	@echo "Run 'make efi-signed' to sign the EFI executables."
+	@echo "Run 'make release' to build a release-ready ZIP archive."
+
 efi: $(patsubst %,efi/boot%.efi,$(EFI_ARCH_LIST))
+	@echo "EFI executables are in the efi/ directory."
+
 efi-signed: $(patsubst %,efi-signed/boot%.efi,$(EFI_ARCH_LIST))
+	@echo "Signed EFI executables are in the efi-signed/ directory."
+
 setup: setup.exe
 
-zip: $(ZIP)
-$(ZIP): efi-signed certificate.cer config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE shim-signed shim.md
-	test ! -d "$(ZIPDIR)"
-	mkdir "$(ZIPDIR)"
-	cp -a $^ "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
-	7z a -mx=9 "$(ZIP)" "$(ZIPDIR)" || (rm -rf "$(ZIPDIR)"; exit 1)
-	rm -rf "$(ZIPDIR)"
+release: release/$(RELEASE_NAME).zip
+	@echo "Current version is packaged: $<"
+
+release/$(RELEASE_NAME): $(EFI_SIGNED_FILES) certificate.cer config.txt splash.bmp setup.exe README.md CHANGELOG.md README.efilib LICENSE shim-signed/* shim.md
+	rm -rf $@
+	tar c --transform=s,^,$@/, $^ | tar x
+
+release/$(RELEASE_NAME).zip: release/$(RELEASE_NAME)
+	rm -rf $@
+	(cd release; 7z a -mx=9 "$(RELEASE_NAME).zip" "$(RELEASE_NAME)" -bd -bb1)
 
 src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
 	echo 'public class GIT_DESCRIBE { public const string data = "$(GIT_DESCRIBE)"; }' > $@
 
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
-	csc /define:GIT_DESCRIBE /out:$@ $^
+	csc /nologo /define:GIT_DESCRIBE /out:$@ $^
 
 certificate.cer pki:
 	@echo
@@ -51,12 +61,9 @@ certificate.cer pki:
 	@echo
 	@false
 
-efi-signed/%.efi: efi/%.efi
-	mkdir -p efi-signed
+efi-signed/%.efi: efi/%.efi pki
+	@mkdir -p efi-signed
 	pesign --force -n pki -i $< -o $@ -c HackBGRT-signer -s
-
-efi-signed/bootx64.efi: pki
-efi-signed/bootia32.efi: pki
 
 efi/bootx64.efi: CLANG_TARGET = x86_64-pc-windows-msvc
 efi/bootx64.efi: GNUEFI_ARCH = x86_64
@@ -82,3 +89,5 @@ efi/bootarm.efi: $(FILES_C)
 
 clean:
 	rm -rf setup.exe efi efi-signed
+	rm -f src/GIT_DESCRIBE.cs
+	rm -rf release
