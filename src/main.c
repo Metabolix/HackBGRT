@@ -112,7 +112,7 @@ ACPI_SDT_HEADER* CreateXsdt(ACPI_SDT_HEADER* xsdt0, UINTN entries) {
 	UINT32 xsdt_len = sizeof(ACPI_SDT_HEADER) + entries * sizeof(UINT64);
 	BS->AllocatePool(EfiACPIReclaimMemory, xsdt_len, (void**)&xsdt);
 	if (!xsdt) {
-		Log(1, L"HackBGRT: Failed to allocate memory for XSDT.\n");
+		Log(1, L"Failed to allocate memory for XSDT.\n");
 		return 0;
 	}
 	BS->SetMem(xsdt, xsdt_len, 0);
@@ -212,7 +212,7 @@ static BMP* MakeBMP(int w, int h, UINT8 r, UINT8 g, UINT8 b) {
 	BMP* bmp = 0;
 	BS->AllocatePool(EfiBootServicesData, 54 + w * h * 4, (void**) &bmp);
 	if (!bmp) {
-		Log(1, L"HackBGRT: Failed to allocate a blank BMP!\n");
+		Log(1, L"Failed to allocate a blank BMP!\n");
 		BS->Stall(1000000);
 		return 0;
 	}
@@ -247,7 +247,7 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 	if (!path) {
 		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
-	Log(config.debug, L"HackBGRT: Loading %s.\n", path);
+	Log(config.debug, L"Loading %s.\n", path);
 	UINTN size = 0;
 	BMP* bmp = LoadFile(root_dir, path, &size);
 	if (bmp) {
@@ -262,9 +262,9 @@ static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
 			return bmp;
 		}
 		BS->FreePool(bmp);
-		Log(1, L"HackBGRT: Invalid BMP (%s)!\n", path);
+		Log(1, L"Invalid BMP (%s)!\n", path);
 	} else {
-		Log(1, L"HackBGRT: Failed to load BMP (%s)!\n", path);
+		Log(1, L"Failed to load BMP (%s)!\n", path);
 	}
 	BS->Stall(1000000);
 	return MakeBMP(16, 16, 255, 0, 0); // error = red image
@@ -330,7 +330,7 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 		// Replace missing = allocate new.
 		BS->AllocatePool(EfiACPIReclaimMemory, sizeof(*bgrt), (void**)&bgrt);
 		if (!bgrt) {
-			Log(1, L"HackBGRT: Failed to allocate memory for BGRT.\n");
+			Log(1, L"Failed to allocate memory for BGRT.\n");
 			return;
 		}
 	}
@@ -383,7 +383,7 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 	bgrt->image_offset_y = max(0, min(max_y, new_y + (new_reso_y - new_bmp->height) / 2));
 
 	Log(config.debug,
-		L"HackBGRT: BMP at (%d, %d), center (%d, %d), resolution (%d, %d), orientation %d.\n",
+		L"BMP at (%d, %d), center (%d, %d), resolution (%d, %d), orientation %d.\n",
 		(int) bgrt->image_offset_x, (int) bgrt->image_offset_y,
 		new_x, new_y, new_reso_x, new_reso_y,
 		new_orientation * 90
@@ -400,9 +400,9 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 static EFI_HANDLE LoadApp(int print_failure, EFI_HANDLE image_handle, EFI_LOADED_IMAGE* image, const CHAR16* path) {
 	EFI_DEVICE_PATH* boot_dp = FileDevicePath(image->DeviceHandle, (CHAR16*) path);
 	EFI_HANDLE result = 0;
-	Log(config.debug, L"HackBGRT: Loading application %s.\n", path);
+	Log(config.debug, L"Loading application %s.\n", path);
 	if (EFI_ERROR(BS->LoadImage(0, image_handle, boot_dp, 0, 0, &result))) {
-		Log(config.debug || print_failure, L"HackBGRT: Failed to load application %s.\n", path);
+		Log(config.debug || print_failure, L"Failed to load application %s.\n", path);
 	}
 	return result;
 }
@@ -419,19 +419,19 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 
 	EFI_LOADED_IMAGE* image;
 	if (EFI_ERROR(BS->HandleProtocol(image_handle, TmpGuidPtr((EFI_GUID) EFI_LOADED_IMAGE_PROTOCOL_GUID), (void**) &image))) {
-		Log(config.debug, L"HackBGRT: LOADED_IMAGE_PROTOCOL failed.\n");
+		Log(config.debug, L"LOADED_IMAGE_PROTOCOL failed.\n");
 		goto fail;
 	}
 
 	EFI_FILE_IO_INTERFACE* io;
 	if (EFI_ERROR(BS->HandleProtocol(image->DeviceHandle, TmpGuidPtr((EFI_GUID) EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID), (void**) &io))) {
-		Log(config.debug, L"HackBGRT: FILE_SYSTEM_PROTOCOL failed.\n");
+		Log(config.debug, L"FILE_SYSTEM_PROTOCOL failed.\n");
 		goto fail;
 	}
 
 	EFI_FILE_HANDLE root_dir;
 	if (EFI_ERROR(io->OpenVolume(io, &root_dir))) {
-		Log(config.debug, L"HackBGRT: Failed to open root directory.\n");
+		Log(config.debug, L"Failed to open root directory.\n");
 		goto fail;
 	}
 
@@ -439,7 +439,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	if (EFI_ERROR(BS->OpenProtocol(image_handle, TmpGuidPtr((EFI_GUID) EFI_SHELL_PARAMETERS_PROTOCOL_GUID), (void**) &shell_param_proto, 0, 0, EFI_OPEN_PROTOCOL_GET_PROTOCOL)) || shell_param_proto->Argc <= 1) {
 		const CHAR16* config_path = L"\\EFI\\HackBGRT\\config.txt";
 		if (!ReadConfigFile(&config, root_dir, config_path)) {
-			Log(1, L"HackBGRT: No config, no command line!\n", config_path);
+			Log(1, L"No config, no command line!\n", config_path);
 			goto fail;
 		}
 	} else {
@@ -479,13 +479,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		if (try_ms_quietly) {
 			goto ready_to_boot;
 		}
-		Log(1, L"HackBGRT: Reverting to %s.\n", config.boot_path);
+		Log(1, L"Reverting to %s.\n", config.boot_path);
 		Log(-1, L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
 		if (ReadKey(15000).ScanCode == SCAN_ESC) {
 			goto fail;
 		}
 	} else ready_to_boot: if (config.debug) {
-		Log(-1, L"HackBGRT: Ready to boot.\n");
+		Log(-1, L"Ready to boot.\n");
 		Log(-1, L"If all goes well, you can set debug=0 and log=0 in config.txt.\n");
 		Log(-1, L"Press escape to cancel or any other key (or wait 15 seconds) to boot.\n");
 		if (ReadKey(15000).ScanCode == SCAN_ESC) {
@@ -496,10 +496,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		ClearLogVariable();
 	}
 	if (EFI_ERROR(BS->StartImage(next_image_handle, 0, 0))) {
-		Log(1, L"HackBGRT: Failed to start %s.\n", config.boot_path);
+		Log(1, L"Failed to start %s.\n", config.boot_path);
 		goto fail;
 	}
-	Log(1, L"HackBGRT: Started %s. Why are we still here?!\n", config.boot_path);
+	Log(1, L"Started %s. Why are we still here?!\n", config.boot_path);
 	Log(-1, L"Please check that %s is not actually HackBGRT!\n", config.boot_path);
 	goto fail;
 

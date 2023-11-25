@@ -14,7 +14,7 @@ enum HackBGRT_action {
  * @see struct HackBGRT_config
  */
 enum HackBGRT_coordinate {
-	HackBGRT_coord_keep = -1000000001
+	HackBGRT_coord_keep = -1000001
 };
 
 /**

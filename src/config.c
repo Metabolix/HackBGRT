@@ -6,7 +6,7 @@ BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir,
 	UINTN data_bytes = 0;
 	data = LoadFileWithPadding(root_dir, path, &data_bytes, 4);
 	if (!data) {
-		Log(1, L"HackBGRT: Failed to load configuration (%s)!\n", path);
+		Log(1, L"Failed to load configuration (%s)!\n", path);
 		return FALSE;
 	}
 	CHAR16* str;
@@ -72,8 +72,8 @@ static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum Ha
 	config->image_weight_sum += weight;
 	UINT32 random = (((UINT64) Random() & 0xffffffff) * config->image_weight_sum) >> 32;
 	UINT32 limit = ((UINT64) 0xffffffff * weight) >> 32;
-	Log(config->debug, L"HackBGRT: n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, random = %x, limit = %x\n", weight, action, x, y, o, path, random, limit);
-	if (!config->image_weight_sum || random <= limit) {
+	Log(config->debug, L"%s n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, rand=%x/%x\n", random <= limit ? L"Using" : L"Skipping", weight, action, x, y, o, path, random, limit);
+	if (random <= limit) {
 		config->action = action;
 		config->image_path = path;
 		config->orientation = o;
@@ -108,7 +108,7 @@ static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) 
 	} else if (StrStr(line, L"keep")) {
 		action = HackBGRT_KEEP;
 	} else {
-		Log(1, L"HackBGRT: Invalid image line: %s\n", line);
+		Log(1, L"Invalid image line: %s\n", line);
 		return;
 	}
 	int weight = n && (!f || n < f) ? Atoi(n) : 1;
@@ -125,7 +125,7 @@ static void ReadConfigResolution(struct HackBGRT_config* config, const CHAR16* l
 		config->resolution_x = *x == '-' ? -(int)Atoi(x+1) : (int)Atoi(x);
 		config->resolution_y = *y == '-' ? -(int)Atoi(y+1) : (int)Atoi(y);
 	} else {
-		Log(1, L"HackBGRT: Invalid resolution line: %s\n", line);
+		Log(1, L"Invalid resolution line: %s\n", line);
 	}
 }
 
