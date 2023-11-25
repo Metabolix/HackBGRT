@@ -403,10 +403,11 @@ public class Efi {
 		Setup.Log($"Read EFI variable: {bootOrder}");
 		Setup.Log($"Read EFI variable: {bootCurrent}");
 		var bootOrderInts = new List<UInt16>(BytesToUInt16s(bootOrder.Data));
-		foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xffff).Select(i => (UInt16) i))) {
+		foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xff).Select(i => (UInt16) i))) {
 			var entry = GetVariable(String.Format("Boot{0:X04}", num));
 			if (entry.Data == null) {
-				if (ownEntry == null) {
+				// Use only Boot0000 .. Boot00FF because some firmwares expect that.
+				if (ownEntry == null && num < 0x100) {
 					ownNum = num;
 					ownEntry = entry;
 				}
