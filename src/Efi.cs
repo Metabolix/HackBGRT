@@ -472,7 +472,12 @@ public class Efi {
 			var bootOrderInts = new List<UInt16>(BytesToUInt16s(bootOrder.Data));
 			// Windows can't enumerate EFI variables, and trying them all is too slow.
 			// BootOrder + BootCurrent + the first 0xff entries should be enough.
-			foreach (var num in BytesToUInt16s(bootCurrent.Data).Concat(bootOrderInts).Concat(Enumerable.Range(0, 0xff).Select(i => (UInt16) i))) {
+			var seen = new HashSet<UInt16>();
+			foreach (var num in bootOrderInts.Concat(BytesToUInt16s(bootCurrent.Data)).Concat(Enumerable.Range(0, 0xff).Select(i => (UInt16) i))) {
+				if (seen.Contains(num)) {
+					continue;
+				}
+				seen.Add(num);
 				var entry = GetVariable(String.Format("Boot{0:X04}", num));
 				if (entry.Data != null) {
 					Setup.Log($"LogBootOrder: {entry}");

@@ -400,6 +400,9 @@ public class Setup {
 			}
 			var fwbootmgr = "{fwbootmgr}";
 			Execute("bcdedit", $"/set {fwbootmgr} displayorder {guid} /addfirst", true);
+			// Verify that the entry was created.
+			Execute("bcdedit", "/enum firmware", true);
+			Execute("bcdedit", $"/enum {guid}", true);
 		} catch (Exception e) {
 			Log($"EnableBCDEdit failed: {e.ToString()}");
 			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
@@ -441,6 +444,8 @@ public class Setup {
 	protected void EnableEntry() {
 		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
 		WriteLine("Enabled NVRAM entry for HackBGRT.");
+		// Verify that the entry was created.
+		Efi.LogBootEntries();
 	}
 
 	/**
