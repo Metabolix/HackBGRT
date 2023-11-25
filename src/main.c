@@ -44,9 +44,13 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP(void) {
 static void SetResolution(int w, int h) {
 	EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = GOP();
 	if (!gop) {
-		config.old_resolution_x = config.resolution_x = 0;
-		config.old_resolution_y = config.resolution_y = 0;
-		Log(config.debug, L"GOP not found!\n");
+		if (config.resolution_x <= 0 || config.resolution_y <= 0) {
+			config.resolution_x = 1024;
+			config.resolution_y = 768;
+		}
+		config.old_resolution_x = config.resolution_x;
+		config.old_resolution_y = config.resolution_y;
+		Log(config.debug, L"GOP not found! Assuming resolution %dx%d.\n", config.resolution_x, config.resolution_y);
 		return;
 	}
 	UINTN best_i = gop->Mode->Mode;
