@@ -637,8 +637,8 @@ public class Setup {
 			WriteLine("BitLocker status could not be determined.");
 			return;
 		}
-		var reOn = new Regex(@"Conversion Status:\s*(Encr|Fully Encr)|Protection Status:\s*Protection On");
-		var reOff = new Regex(@"Conversion Status:\s*(Fully Decrypted)|Protection Status:\s*Protection Off");
+		var reOn = new Regex(@"Conversion Status:\s*.*Encr|AES");
+		var reOff = new Regex(@"Conversion Status:\s*(Fully Decrypted)|\s0[.,]0\s*%");
 		var isOn = reOn.Match(output).Success;
 		var isOff = reOff.Match(output).Success;
 		if (!isOn && isOff) {
