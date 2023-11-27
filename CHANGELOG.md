@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.3.0 - 2023-11-27
+
+### Added
+- AArch64 and ARM builds, and *shim* for AArch64.
+
+### Fixed
+- Boot entry is more reliable, avoids conflicts with firmware entries.
+
 ## 2.2.0 - 2023-11-17
 
 ### Added
