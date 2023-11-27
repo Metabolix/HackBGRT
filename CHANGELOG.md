@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.3.1 - 2023-11-27
+
+### Fixed
+- BitLocker detection is more reliable.
+
 ## 2.3.0 - 2023-11-27
 
 ### Added
