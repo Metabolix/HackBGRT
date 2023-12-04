@@ -239,17 +239,17 @@ static BMP* MakeBMP(int w, int h, UINT8 r, UINT8 g, UINT8 b) {
 /**
  * Load a bitmap or generate a black one.
  *
- * @param root_dir The root directory for loading a BMP.
- * @param path The BMP path within the root directory; NULL for a black BMP.
+ * @param base_dir The directory for loading a BMP.
+ * @param path The BMP path within the directory; NULL for a black BMP.
  * @return The loaded BMP, or 0 if not available.
  */
-static BMP* LoadBMP(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
+static BMP* LoadBMP(EFI_FILE_HANDLE base_dir, const CHAR16* path) {
 	if (!path) {
 		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
 	Log(config.debug, L"Loading %s.\n", path);
 	UINTN size = 0;
-	BMP* bmp = LoadFile(root_dir, path, &size);
+	BMP* bmp = LoadFile(base_dir, path, &size);
 	if (bmp) {
 		if (size >= bmp->file_size
 		&& CompareMem(bmp, "BM", 2) == 0
@@ -299,9 +299,9 @@ static void CropBMP(BMP* bmp, int w, int h) {
 /**
  * The main logic for BGRT modification.
  *
- * @param root_dir The root directory for loading a BMP.
+ * @param base_dir The directory for loading a BMP.
  */
-void HackBgrt(EFI_FILE_HANDLE root_dir) {
+void HackBgrt(EFI_FILE_HANDLE base_dir) {
 	// REMOVE: simply delete all BGRT entries.
 	if (config.action == HackBGRT_REMOVE) {
 		HandleAcpiTables(config.action, 0);
@@ -352,7 +352,7 @@ void HackBgrt(EFI_FILE_HANDLE root_dir) {
 	// Get the image (either old or new).
 	BMP* new_bmp = old_bmp;
 	if (config.action == HackBGRT_REPLACE) {
-		new_bmp = LoadBMP(root_dir, config.image_path);
+		new_bmp = LoadBMP(base_dir, config.image_path);
 	}
 
 	// No image = no need for BGRT.
@@ -435,10 +435,16 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 
+	EFI_FILE_HANDLE base_dir;
+	if (EFI_ERROR(root_dir->Open(root_dir, &base_dir, L"\\EFI\\HackBGRT", EFI_FILE_MODE_READ, 0))) {
+		Log(config.debug, L"Failed to HackBGRT directory.\n");
+		base_dir = root_dir;
+	}
+
 	EFI_SHELL_PARAMETERS_PROTOCOL *shell_param_proto = NULL;
 	if (EFI_ERROR(BS->OpenProtocol(image_handle, TmpGuidPtr((EFI_GUID) EFI_SHELL_PARAMETERS_PROTOCOL_GUID), (void**) &shell_param_proto, 0, 0, EFI_OPEN_PROTOCOL_GET_PROTOCOL)) || shell_param_proto->Argc <= 1) {
-		const CHAR16* config_path = L"\\EFI\\HackBGRT\\config.txt";
-		if (!ReadConfigFile(&config, root_dir, config_path)) {
+		const CHAR16* config_path = L"config.txt";
+		if (!ReadConfigFile(&config, base_dir, config_path)) {
 			Log(1, L"No config, no command line!\n", config_path);
 			goto fail;
 		}
@@ -446,7 +452,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		CHAR16 **argv = shell_param_proto->Argv;
 		int argc = shell_param_proto->Argc;
 		for (int i = 1; i < argc; ++i) {
-			ReadConfigLine(&config, root_dir, argv[i]);
+			ReadConfigLine(&config, base_dir, argv[i]);
 		}
 	}
 
@@ -455,7 +461,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	}
 
 	SetResolution(config.resolution_x, config.resolution_y);
-	HackBgrt(root_dir);
+	HackBgrt(base_dir);
 
 	EFI_HANDLE next_image_handle = 0;
 	static CHAR16 backup_boot_path[] = L"\\EFI\\HackBGRT\\bootmgfw-original.efi";

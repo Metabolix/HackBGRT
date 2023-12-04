@@ -39,17 +39,17 @@ struct HackBGRT_config {
  * Read a configuration parameter. (May recursively read config files.)
  *
  * @param config The configuration to modify.
- * @param root_dir The root directory, in case the parameter contains an include.
+ * @param base_dir The base directory, in case the parameter contains an include.
  * @param line The configuration line to parse.
  */
-extern void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* line);
+extern void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE base_dir, const CHAR16* line);
 
 /**
  * Read a configuration file. (May recursively read more files.)
  *
  * @param config The configuration to modify.
- * @param root_dir The root directory.
+ * @param base_dir The base directory.
  * @param path The path to the file.
  * @return FALSE, if the file couldn't be read, TRUE otherwise.
  */
-extern BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* path);
+extern BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE base_dir, const CHAR16* path);

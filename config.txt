@@ -16,16 +16,14 @@ boot=MS
 #  - "keep" to keep the firmware logo. Also keeps coordinates by default.
 #  - "remove" to remove the BGRT. Makes x and y meaningless.
 #  - "black" to use only a black image. Makes x and y meaningless.
-#  - "path=..." to read a BMP file.
-#    * NOTE: For path=\EFI\HackBGRT\*, the installer will copy and convert the file if necessary.
-#    * NOTE: For other paths, make sure that the file is a 24-bit BMP file with a 54-byte header.
-#    * NOTE: The file must be on the EFI System Partition. Do not add a drive letter!
+#  - "path=file.bmp" to read an image file.
+#    * NOTE: The installer can copy and convert BMP, PNG, JPEG, GIF.
 # Examples:
 #  - image=remove
 #  - image=black
-#  - image= x=0 y=-200 path=\EFI\HackBGRT\topimage.bmp
-#  - image= n=1 o=90 path=\EFI\HackBGRT\sideways.bmp
-#  - image= n=50 y=999999 o=keep path=\EFI\HackBGRT\probable.bmp
+#  - image= x=0 y=-200 path=topimage.bmp
+#  - image= n=1 o=90 path=sideways.bmp
+#  - image= n=50 y=999999 o=keep path=probable.bmp
 # The above examples together would produce
 #  - 1/54 chance for the default OS logo
 #  - 1/54 chance for black screen
@@ -33,7 +31,7 @@ boot=MS
 #  - 1/54 chance for splash.bmp, centered, orientation set to 90 degrees
 #  - 50/54 chance for probable.bmp, at the bottom edge, explicitly default orientation
 # Default: just one image.
-image= y=-200 path=\EFI\HackBGRT\splash.bmp
+image= y=-200 path=splash.bmp
 
 # Preferred resolution. Use 0x0 for maximum and -1x-1 for original.
 resolution=0x0

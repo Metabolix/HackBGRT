@@ -1,10 +1,10 @@
 #include "config.h"
 #include "util.h"
 
-BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* path) {
+BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE base_dir, const CHAR16* path) {
 	void* data = 0;
 	UINTN data_bytes = 0;
-	data = LoadFileWithPadding(root_dir, path, &data_bytes, 4);
+	data = LoadFileWithPadding(base_dir, path, &data_bytes, 4);
 	if (!data) {
 		Log(1, L"Failed to load configuration (%s)!\n", path);
 		return FALSE;
@@ -61,7 +61,7 @@ BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir,
 			str[j] = 0;
 			++j;
 		}
-		ReadConfigLine(config, root_dir, &str[i]);
+		ReadConfigLine(config, base_dir, &str[i]);
 		i = j;
 	}
 	// NOTICE: string is not freed, because paths are not copied.
@@ -129,7 +129,7 @@ static void ReadConfigResolution(struct HackBGRT_config* config, const CHAR16* l
 	}
 }
 
-void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, const CHAR16* line) {
+void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE base_dir, const CHAR16* line) {
 	line = TrimLeft(line);
 	if (line[0] == L'#' || line[0] == 0) {
 		return;
@@ -152,7 +152,7 @@ void ReadConfigLine(struct HackBGRT_config* config, EFI_FILE_HANDLE root_dir, co
 		return;
 	}
 	if (StrnCmp(line, L"config=", 7) == 0) {
-		ReadConfigFile(config, root_dir, line + 7);
+		ReadConfigFile(config, base_dir, line + 7);
 		return;
 	}
 	if (StrnCmp(line, L"resolution=", 11) == 0) {

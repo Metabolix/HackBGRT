@@ -352,10 +352,16 @@ public class Setup {
 		var lines = File.ReadAllLines("config.txt");
 		Log($"config.txt:\n{String.Join("\n", lines)}");
 		foreach (var line in lines.Where(s => s.StartsWith("image="))) {
-			var delim = "path=\\EFI\\HackBGRT\\";
+			var delim = "path=";
 			var i = line.IndexOf(delim);
 			if (i > 0) {
-				InstallImageFile(line.Substring(i + delim.Length));
+				var dir = "\\EFI\\HackBGRT\\";
+				if (line.Substring(i + delim.Length).StartsWith(dir)) {
+					InstallImageFile(line.Substring(i + delim.Length + dir.Length));
+				}
+				if (!line.Substring(i + delim.Length).StartsWith("\\")) {
+					InstallImageFile(line.Substring(i + delim.Length));
+				}
 			}
 		}
 		var loaderDest = "loader.efi";
