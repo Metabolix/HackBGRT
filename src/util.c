@@ -177,6 +177,7 @@ EFI_STATUS WaitKey(UINT64 timeout_ms) {
 
 EFI_INPUT_KEY ReadKey(UINT64 timeout_ms) {
 	EFI_INPUT_KEY key = {0};
+	ST->ConOut->EnableCursor(ST->ConOut, 1);
 	WaitKey(timeout_ms);
 	ST->ConIn->ReadKeyStroke(ST->ConIn, &key);
 	return key;

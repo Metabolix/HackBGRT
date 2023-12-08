@@ -415,6 +415,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	BS = ST_->BootServices;
 	RT = ST_->RuntimeServices;
 
+	// Clear the screen to wipe the vendor logo.
+	ST->ConOut->EnableCursor(ST->ConOut, 0);
+	ST->ConOut->ClearScreen(ST->ConOut);
+
 	Log(0, L"HackBGRT version: %s\n", version);
 
 	EFI_LOADED_IMAGE* image;
