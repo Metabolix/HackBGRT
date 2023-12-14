@@ -1,6 +1,8 @@
 # FREE WING mod version 2020/11 to 2023/11
-2023/10 [Merge master Metabolix Update change log and tag v2.1.0 da9909b #7](https://github.com/FREEWING-JP/HackBGRT/pull/7)  
-2023/11 [Merge master Metabolix Update change log and tag v2.2.0 5856d25 #9](https://github.com/FREEWING-JP/HackBGRT/pull/9)  
+.|.|.|.
+---|---|---|---
+2023/10|v2.1.0| [Merge master Metabolix Update change log and tag v2.1.0 da9909b #7](https://github.com/FREEWING-JP/HackBGRT/pull/7)  | ---
+2023/11|v2.2.0| [Merge master Metabolix Update change log and tag v2.2.0 5856d25 #9](https://github.com/FREEWING-JP/HackBGRT/pull/9)  | Works fine
 
 ## HackBGRT_MULTI
 * Support PNG format image file  
