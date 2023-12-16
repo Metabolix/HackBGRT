@@ -996,7 +996,13 @@ public class Setup {
 			WriteLine();
 			WriteLine($"Unexpected error: {e.Message}");
 			Log(e.ToString());
-			WriteLine("If this is the most current release, please report this bug.");
+			if (e is MissingMemberException || e is TypeLoadException) {
+				WriteLine("This installer requires a recent version of .Net Framework.");
+				WriteLine("Use Windows Update or download manually:");
+				WriteLine("https://dotnet.microsoft.com/en-us/download/dotnet-framework");
+			} else {
+				WriteLine("If this is the most current release, please report this bug.");
+			}
 			return 1;
 		} finally {
 			if (DryRun) {
