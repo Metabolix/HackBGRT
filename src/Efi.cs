@@ -93,6 +93,7 @@ public class Efi {
 			var pos = 6 + 2 * (Label.Length + 1);
 			var pathNodesEnd = pos + pathNodesLength;
 			DevicePathNodes = new List<DevicePathNode>();
+			Arguments = new byte[0];
 			while (pos + 4 <= pathNodesEnd) {
 				var len = BitConverter.ToUInt16(data, pos + 2);
 				if (len < 4 || pos + len > pathNodesEnd) {
@@ -378,9 +379,10 @@ public class Efi {
 	 *
 	 * @param label Label of the boot entry.
 	 * @param fileName File name of the boot entry.
+	 * @param alwaysCopyFromMS If true, do not preserve any existing data.
 	 * @param dryRun Don't actually create the entry.
 	 */
-	public static void MakeAndEnableBootEntry(string label, string fileName, bool dryRun = false) {
+	public static void MakeAndEnableBootEntry(string label, string fileName, bool alwaysCopyFromMS, bool dryRun = false) {
 		Variable msEntry = null, ownEntry = null;
 		UInt16 msNum = 0, ownNum = 0;
 
@@ -435,12 +437,28 @@ public class Efi {
 			throw new Exception("MakeBootEntry: Windows Boot Manager not found.");
 		} else {
 			Setup.Log($"Read EFI variable: {msEntry}");
+			Setup.Log($"Read EFI variable: {ownEntry}");
 			// Make a new boot entry using the MS entry as a starting point.
 			var entryData = new BootEntryData(msEntry.Data);
-			entryData.Arguments = Encoding.UTF8.GetBytes(label + "\0");
+			if (!alwaysCopyFromMS && ownEntry.Data != null) {
+				entryData = new BootEntryData(ownEntry.Data);
+				// Shim expects the arguments to be a filename or nothing.
+				// But BCDEdit expects some Microsoft-specific data.
+				// Modify the entry so that BCDEdit still recognises it
+				// but the data becomes a valid UCS-2 / UTF-16LE file name.
+				var str = new string(entryData.Arguments.Take(12).Select(c => (char) c).ToArray());
+				if (str == "WINDOWS\0\x01\0\0\0") {
+					entryData.Arguments[8] = (byte) 'X';
+				} else if (str != "WINDOWS\0\x58\0\0\0") {
+					// Not recognized. Clear the arguments.
+					entryData.Arguments = new byte[0];
+				}
+			} else {
+				entryData.Arguments = new byte[0];
+				entryData.Label = label;
+				entryData.FileName = fileName;
+			}
 			entryData.Attributes = 1; // LOAD_OPTION_ACTIVE
-			entryData.Label = label;
-			entryData.FileName = fileName;
 			ownEntry.Attributes = 7; // EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS
 			ownEntry.Data = entryData.ToBytes();
 			SetVariable(ownEntry, dryRun);

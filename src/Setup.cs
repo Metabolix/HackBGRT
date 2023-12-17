@@ -373,6 +373,7 @@ public class Setup {
 			loaderDest = $"grub{EfiArch}.efi";
 		}
 		InstallFile(loaderSource, loaderDest);
+		InstallFile(loaderSource, "\u4957\u444e\u574f\u0053\u0058"); // bytes "WINDOWS\0X\0" as UTF-16
 		if (LoaderIsSigned) {
 			InstallFile("certificate.cer");
 		}
@@ -415,6 +416,7 @@ public class Setup {
 			WriteLine("Enabled NVRAM entry for HackBGRT with BCDEdit.");
 			// Verify that the entry was created.
 			Execute("bcdedit", "/enum firmware", true);
+			Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", false, DryRun);
 			Execute("bcdedit", $"/enum {guid}", true);
 			Efi.LogBootEntries();
 		} catch (Exception e) {
@@ -460,7 +462,7 @@ public class Setup {
 	 * Enable HackBGRT boot entry.
 	 */
 	protected void EnableEntry() {
-		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
+		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", true, DryRun);
 		WriteLine("Enabled NVRAM entry for HackBGRT.");
 		// Verify that the entry was created.
 		Efi.LogBootEntries();
