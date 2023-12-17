@@ -6,6 +6,8 @@ HackBGRT is intended as a boot logo changer for UEFI-based Windows systems.
 
 When booting on a UEFI-based computer, Windows may show a vendor-defined logo which is stored on the UEFI firmware in a section called Boot Graphics Resource Table (BGRT). It's usually very difficult to change the image permanently, but a custom UEFI application may be used to overwrite it during the boot. HackBGRT does exactly that.
 
+**Note:** The original logo is often visible for a moment before HackBGRT is started. This is expected, please do not report this "bug". This can't be changed without modifying computer firmware, which this project will not do.
+
 ## Usage
 
 **Important:** If you mess up the installation, your system may become unbootable! Create a rescue disk before use. This software comes with no warranty. Use at your own risk.
