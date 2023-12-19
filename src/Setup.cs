@@ -519,7 +519,7 @@ public class Setup {
 	 */
 	protected void VerifyLoaderConfig() {
 		var lines = File.ReadAllLines("config.txt");
-		var loader = lines.Where(s => s.StartsWith("boot=")).Select(s => s.Substring(5)).Prepend("").Last();
+		var loader = lines.Where(s => s.StartsWith("boot=")).Select(s => s.Substring(5)).LastOrDefault();
 		if (loader == null) {
 			throw new SetupException("config.txt does not contain a boot=... line!");
 		}
@@ -716,8 +716,13 @@ public class Setup {
 	 * @param arch The architecture.
 	 */
 	protected void SetArch(string arch) {
-		var detectedArch = DetectArchFromOS();
-		if (arch == "") {
+		var detectedArch = Environment.Is64BitOperatingSystem ? "x64" : "ia32";
+		try {
+			detectedArch = DetectArchFromOS();
+		} catch {
+			WriteLine($"Failed to detect OS architecture, assuming {detectedArch}.");
+		}
+		if (arch == "" || arch == null) {
 			EfiArch = detectedArch;
 			WriteLine($"Your OS uses arch={EfiArch}. This will be checked again during installation.");
 		} else {
@@ -963,7 +968,7 @@ public class Setup {
 		Batch = args.Contains("batch");
 		ForwardArguments = String.Join(" ", args.Where(s => s == "dry-run" || s == "batch" || s.StartsWith("arch=")));
 		try {
-			SetArch(args.Prepend("arch=").Last(s => s.StartsWith("arch=")).Substring(5));
+			SetArch(args.Where(s => s.StartsWith("arch=")).Select(s => s.Substring(5)).LastOrDefault());
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				WriteLine("This installer needs to be run as administrator!");
 				return 1;
