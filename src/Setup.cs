@@ -239,6 +239,8 @@ public class Setup {
 				0x0200 => "ia64",
 				0x8664 => "x64",
 				0xaa64 => "aa64",
+				0x01c2 => "arm",
+				0x01c4 => "arm",
 				_ => $"unknown-{peArch:x4}"
 			};
 		} catch {
