@@ -494,6 +494,9 @@ public class Efi {
 	public static string GetHackBGRTLog() {
 		try {
 			var log = GetVariable("HackBGRTLog", EFI_HACKBGRT_GUID);
+			if (log.Data == null) {
+				return "(null)";
+			}
 			return new string(BytesToUInt16s(log.Data).Select(i => (char)i).ToArray());
 		} catch (Exception e) {
 			return $"Log not found: {e.ToString()}";
