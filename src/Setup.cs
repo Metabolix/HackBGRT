@@ -398,6 +398,10 @@ public class Setup {
 	 * Enable HackBGRT with bcdedit.
 	 */
 	protected void EnableBCDEdit() {
+		if (DryRun) {
+			WriteLine("Dry run, skip enabling with BCDEdit.");
+			return;
+		}
 		try {
 			var re = new Regex("[{][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[}]");
 			var guid = re.Match(Execute("bcdedit", "/copy {bootmgr} /d HackBGRT", true)).Value;
@@ -408,9 +412,11 @@ public class Setup {
 			}
 			var fwbootmgr = "{fwbootmgr}";
 			Execute("bcdedit", $"/set {fwbootmgr} displayorder {guid} /addfirst", true);
+			WriteLine("Enabled NVRAM entry for HackBGRT with BCDEdit.");
 			// Verify that the entry was created.
 			Execute("bcdedit", "/enum firmware", true);
 			Execute("bcdedit", $"/enum {guid}", true);
+			Efi.LogBootEntries();
 		} catch (Exception e) {
 			Log($"EnableBCDEdit failed: {e.ToString()}");
 			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
@@ -435,14 +441,18 @@ public class Setup {
 			} else if (entry.IndexOf("HackBGRT") >= 0) {
 				found = true;
 				Log($"Disabling HackBGRT entry {guid}.");
-				if (Execute("bcdedit", $"/delete {guid}", true) == null) {
+				if (!DryRun && Execute("bcdedit", $"/delete {guid}", true) == null) {
 					Log($"DisableBCDEdit failed to delete {guid}.");
+				} else {
+					disabled = true;
 				}
-				disabled = true;
 			}
 		}
-		if (found && !disabled) {
-			throw new SetupException("Failed to disable HackBGRT with BCDEdit!");
+		if (found) {
+			if (!disabled) {
+				throw new SetupException("Failed to disable HackBGRT with BCDEdit!");
+			}
+			WriteLine("Disabled NVRAM entry for HackBGRT with BCDEdit.");
 		}
 	}
 
@@ -454,6 +464,7 @@ public class Setup {
 		WriteLine("Enabled NVRAM entry for HackBGRT.");
 		// Verify that the entry was created.
 		Efi.LogBootEntries();
+		Execute("bcdedit", "/enum firmware", true);
 	}
 
 	/**
