@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.4.0 - 2023-12-31
+
+### Fixed
+- Fix BCDEdit boot entries to avoid *shim* error messages.
+- Combine BCDEdit and own code to create boot entries more reliably.
+
+### Changed
+- Clear the screen to wipe the vendor logo as soon as possible.
+- Image paths in `config.txt` may be relative (just file names).
+
 ## 2.3.1 - 2023-11-27
 
 ### Fixed
