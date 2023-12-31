@@ -807,7 +807,7 @@ public class Setup {
 		WriteLine(" I = install");
 		WriteLine("     - creates a new EFI boot entry for HackBGRT");
 		WriteLine(" J = install (alternative)");
-		WriteLine("     - creates a new EFI boot entry with an alternative method (BCDEdit)");
+		WriteLine("     - creates a new EFI boot entry with an alternative method");
 		WriteLine("     - try this if the first option doesn't work");
 		WriteLine(" O = install (legacy)");
 		WriteLine("     - overwrites the MS boot loader; gets removed by Windows updates");
@@ -827,15 +827,15 @@ public class Setup {
 		var k = Console.ReadKey().Key;
 		Log($"User input: {k}");
 		WriteLine();
-		if (k == ConsoleKey.I || k == ConsoleKey.O || k == ConsoleKey.F) {
+		if (k == ConsoleKey.I || k == ConsoleKey.J || k == ConsoleKey.O || k == ConsoleKey.F) {
 			Configure();
 		}
 		if (k == ConsoleKey.I) {
-			RunPrivilegedActions(new string[] { "install", "enable-entry" });
+			RunPrivilegedActions(new string[] { "install", "disable", "enable-bcdedit" });
 		} else if (k == ConsoleKey.J) {
-			RunPrivilegedActions(new string[] { "install", "enable-bcdedit" });
+			RunPrivilegedActions(new string[] { "install", "disable", "enable-entry" });
 		} else if (k == ConsoleKey.O) {
-			RunPrivilegedActions(new string[] { "install", "enable-overwrite" });
+			RunPrivilegedActions(new string[] { "install", "disable", "enable-overwrite" });
 		} else if (k == ConsoleKey.F) {
 			RunPrivilegedActions(new string[] { "install" });
 		} else if (k == ConsoleKey.D) {
