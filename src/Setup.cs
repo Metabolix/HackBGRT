@@ -596,7 +596,9 @@ public class Setup {
 	protected void Uninstall() {
 		Disable();
 		try {
-			Directory.Delete(InstallPath, true);
+			if (Directory.Exists(InstallPath)) {
+				Directory.Delete(InstallPath, true);
+			}
 			WriteLine($"HackBGRT has been removed from {InstallPath}.");
 		} catch (Exception e) {
 			Log($"Uninstall failed: {e.ToString()}");
