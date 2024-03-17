@@ -1,6 +1,6 @@
 #pragma once
 
-#include <efi.h>
+#include "efi.h"
 
 /**
  * Convert a short ASCII string to UCS2, store in a static array.
@@ -12,9 +12,12 @@
 extern const CHAR16* TmpStr(CHAR8 *src, int length);
 
 /**
- * Empty function that has the same signature as Print.
+ * Print or log a string.
+ *
+ * @param mode -1 = print without logging, 0 = no, 1 = yes.
+ * @param fmt The format string. Supports %d, %x, %s.
  */
-extern void Log(int print, IN CONST CHAR16 *fmt, ...);
+extern void Log(int mode, IN CONST CHAR16 *fmt, ...);
 
 /**
  * Dump the log buffer to the screen.
@@ -117,3 +120,11 @@ static inline void* LoadFile(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* siz
 	return LoadFileWithPadding(dir, path, size_ptr, 0);
 }
 
+/**
+ * Get a temporary pointer to GUID.
+ */
+static inline EFI_GUID* TmpGuidPtr(EFI_GUID guid) {
+	static EFI_GUID g;
+	g = guid;
+	return &g;
+}

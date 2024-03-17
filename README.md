@@ -67,6 +67,8 @@ HackBGRT is intended as a boot logo changer for UEFI-based Windows systems.
 
 When booting on a UEFI-based computer, Windows may show a vendor-defined logo which is stored on the UEFI firmware in a section called Boot Graphics Resource Table (BGRT). It's usually very difficult to change the image permanently, but a custom UEFI application may be used to overwrite it during the boot. HackBGRT does exactly that.
 
+**Note:** The original logo is often visible for a moment before HackBGRT is started. This is expected, please do not report this "bug". This can't be changed without modifying computer firmware, which this project will not do.
+
 ## Usage
 
 **Important:** If you mess up the installation, your system may become unbootable! Create a rescue disk before use. This software comes with no warranty. Use at your own risk.
@@ -131,13 +133,11 @@ The configuration options are described in `config.txt`, which the installer cop
 
 ## Images
 
-The image path can be changed in the configuration file. The default path is `[EFI System Partition]\EFI\HackBGRT\splash.bmp`.
+If you only need one image, just edit `splash.bmp` to your needs.
 
-The installer copies and converts files whose `path` starts with `\EFI\HackBGRT\`. For example, to use a file named `my.jpg`, copy it in the installer folder (same folder as `setup.exe`) and set the image path in `config.txt` to `path=\EFI\HackBGFT\my.jpg`.
+Advanced users may edit the `config.txt` to define multiple images, in which case one is picked at random. The installer copies and converts the images. For example, to use a file named `my.jpg`, copy it in the installer folder (same folder as `setup.exe`) and set the image path in `config.txt` to `path=my.jpg` before running the installer.
 
 If you copy an image file to ESP manually, note that the image must be a 24-bit BMP file with a 54-byte header. That's a TrueColor BMP3 in Imagemagick, or 24-bit BMP/DIB in Microsoft Paint.
-
-Advanced users may edit the `config.txt` to define multiple images, in which case one is picked at random.
 
 ## Recovery
 
@@ -145,6 +145,6 @@ If something breaks and you can't boot to Windows, you need to use the Windows i
 
 ## Building
 
-* Compiler: GCC targeting w64-mingw32
+* Compiler: Clang
 * Compiler flags: see Makefile
 * Libraries: gnu-efi

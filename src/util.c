@@ -1,7 +1,5 @@
 #include "util.h"
 
-#include <efilib.h>
-
 const CHAR16* TmpStr(CHAR8 *src, int length) {
 	static CHAR16 arr[4][16];
 	static int j;
@@ -14,31 +12,99 @@ const CHAR16* TmpStr(CHAR8 *src, int length) {
 	return dest;
 }
 
+const CHAR16* TmpIntToStr(UINT32 x) {
+	static CHAR16 buf[20];
+	int i = 20 - 1;
+	buf[i] = 0;
+	if (!x) {
+		buf[--i] = '0';
+	}
+	while (x && i) {
+		buf[--i] = '0' + (x % 10);
+		x /= 10;
+	}
+	return &buf[i];
+}
+
 #define log_buffer_size (65536)
 CHAR16 log_buffer[log_buffer_size] = {0};
 
 CHAR16 LogVarName[] = L"HackBGRTLog";
 EFI_GUID LogVarGuid = {0x03c64761, 0x075f, 0x4dba, {0xab, 0xfb, 0x2e, 0xd8, 0x9e, 0x18, 0xb2, 0x36}}; // self-made: 03c64761-075f-4dba-abfb-2ed89e18b236
 
-void Log(int print, IN CONST CHAR16 *fmt, ...) {
+void Log(int mode, IN CONST CHAR16 *fmt, ...) {
 	va_list args;
-	CHAR16 buf[256];
+	CHAR16 buf[256] = {0};
+	int buf_i = 0;
+	#define putchar(c) { if (buf_i < 255) { buf[buf_i++] = c; } }
 	va_start(args, fmt);
-	VSPrint(buf, sizeof(buf), fmt, args); // size is in bytes, not CHAR16s
-	va_end(args);
-	if (print) {
-		Print(L"%s", buf);
+	for (int i = 0; fmt[i]; ++i) {
+		if (fmt[i] == '\n') {
+			putchar('\r');
+			putchar('\n');
+			continue;
+		}
+		if (fmt[i] != '%') {
+			putchar(fmt[i]);
+			continue;
+		}
+		++i;
+		switch (fmt[i]) {
+			case '%': putchar('%'); continue;
+			case 'd': goto fmt_decimal;
+			case 'x': goto fmt_hex;
+			case 's': goto fmt_string;
+			case 0: goto fmt_end;
+		}
+		putchar('%');
+		putchar(fmt[i]);
+		continue;
+
+		if (0) fmt_decimal: {
+			INT32 x = va_arg(args, INT32);
+			if (x < 0) {
+				putchar('-');
+				x = -x;
+			}
+			const CHAR16* s = TmpIntToStr(x);
+			while (*s) {
+				putchar(*s++);
+			}
+		}
+		if (0) fmt_hex: {
+			UINT32 x = va_arg(args, UINT32);
+			for (int pos = 8, started = 0; pos--;) {
+				int d = (x >> (4 * pos)) & 0xf;
+				if (d || started || pos == 0) {
+					putchar("0123456789abcdef"[d]);
+					started = 1;
+				}
+			}
+		}
+		if (0) fmt_string: {
+			CHAR16* s = va_arg(args, CHAR16*);
+			while (*s) {
+				putchar(*s++);
+			}
+		}
 	}
-	StrnCat(log_buffer, buf, log_buffer_size - StrLen(log_buffer) - 1);
-	LibSetVariable(LogVarName, &LogVarGuid, StrLen(log_buffer) * 2, log_buffer);
+	fmt_end:
+	va_end(args);
+	if (mode) {
+		ST->ConOut->OutputString(ST->ConOut, buf);
+	}
+	if (mode != -1) {
+		StrnCat(log_buffer, buf, log_buffer_size - StrLen(log_buffer) - 1);
+		RT->SetVariable(LogVarName, &LogVarGuid, EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS, StrLen(log_buffer) * 2, log_buffer);
+	}
 }
 
 void DumpLog(void) {
-	Print(L"%s", log_buffer);
+	ST->ConOut->OutputString(ST->ConOut, log_buffer);
 }
 
 void ClearLogVariable(void) {
-	LibDeleteVariable(LogVarName, &LogVarGuid);
+	RT->SetVariable(LogVarName, &LogVarGuid, EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS, 0, 0);
 }
 
 const CHAR16* TrimLeft(const CHAR16* s) {
@@ -94,11 +160,24 @@ void RandomSeedAuto(void) {
 EFI_STATUS WaitKey(UINT64 timeout_ms) {
 	ST->ConIn->Reset(ST->ConIn, FALSE);
 	const int ms_to_100ns = 10000;
-	return WaitForSingleEvent(ST->ConIn->WaitForKey, timeout_ms * ms_to_100ns);
+
+	EFI_EVENT events[2] = {ST->ConIn->WaitForKey};
+	EFI_STATUS status = BS->CreateEvent(EVT_TIMER, 0, NULL, NULL, &events[1]);
+	if (!EFI_ERROR(status)) {
+		BS->SetTimer(events[1], TimerRelative, timeout_ms * ms_to_100ns);
+		UINTN index;
+		status = BS->WaitForEvent(2, events, &index);
+		BS->CloseEvent(events[1]);
+		if (!EFI_ERROR(status) && index == 1) {
+			status = EFI_TIMEOUT;
+		}
+	}
+	return status;
 }
 
 EFI_INPUT_KEY ReadKey(UINT64 timeout_ms) {
 	EFI_INPUT_KEY key = {0};
+	ST->ConOut->EnableCursor(ST->ConOut, 1);
 	WaitKey(timeout_ms);
 	ST->ConIn->ReadKeyStroke(ST->ConIn, &key);
 	return key;
@@ -113,9 +192,11 @@ void* LoadFileWithPadding(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* size_p
 		return 0;
 	}
 
-	EFI_FILE_INFO *info = LibFileInfo(handle);
-	UINTN size = info->FileSize;
-	FreePool(info);
+	UINT64 get_size = 0;
+	handle->SetPosition(handle, ~(UINT64)0);
+	handle->GetPosition(handle, &get_size);
+	handle->SetPosition(handle, 0);
+	UINTN size = (UINTN) get_size;
 
 	void* data = 0;
 	e = BS->AllocatePool(EfiBootServicesData, size + padding, &data);
@@ -129,7 +210,7 @@ void* LoadFileWithPadding(EFI_FILE_HANDLE dir, const CHAR16* path, UINTN* size_p
 	}
 	handle->Close(handle);
 	if (EFI_ERROR(e)) {
-		FreePool(data);
+		BS->FreePool(data);
 		return 0;
 	}
 	if (size_ptr) {

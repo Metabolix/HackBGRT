@@ -239,6 +239,8 @@ public class Setup {
 				0x0200 => "ia64",
 				0x8664 => "x64",
 				0xaa64 => "aa64",
+				0x01c2 => "arm",
+				0x01c4 => "arm",
 				_ => $"unknown-{peArch:x4}"
 			};
 		} catch {
@@ -352,10 +354,16 @@ public class Setup {
 		var lines = File.ReadAllLines("config.txt");
 		Log($"config.txt:\n{String.Join("\n", lines)}");
 		foreach (var line in lines.Where(s => s.StartsWith("image="))) {
-			var delim = "path=\\EFI\\HackBGRT\\";
+			var delim = "path=";
 			var i = line.IndexOf(delim);
 			if (i > 0) {
-				InstallImageFile(line.Substring(i + delim.Length));
+				var dir = "\\EFI\\HackBGRT\\";
+				if (line.Substring(i + delim.Length).StartsWith(dir)) {
+					InstallImageFile(line.Substring(i + delim.Length + dir.Length));
+				}
+				if (!line.Substring(i + delim.Length).StartsWith("\\")) {
+					InstallImageFile(line.Substring(i + delim.Length));
+				}
 			}
 		}
 		var loaderDest = "loader.efi";
@@ -365,6 +373,7 @@ public class Setup {
 			loaderDest = $"grub{EfiArch}.efi";
 		}
 		InstallFile(loaderSource, loaderDest);
+		InstallFile(loaderSource, "\u4957\u444e\u574f\u0053\u0058"); // bytes "WINDOWS\0X\0" as UTF-16
 		if (LoaderIsSigned) {
 			InstallFile("certificate.cer");
 		}
@@ -390,6 +399,10 @@ public class Setup {
 	 * Enable HackBGRT with bcdedit.
 	 */
 	protected void EnableBCDEdit() {
+		if (DryRun) {
+			WriteLine("Dry run, skip enabling with BCDEdit.");
+			return;
+		}
 		try {
 			var re = new Regex("[{][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[}]");
 			var guid = re.Match(Execute("bcdedit", "/copy {bootmgr} /d HackBGRT", true)).Value;
@@ -400,6 +413,12 @@ public class Setup {
 			}
 			var fwbootmgr = "{fwbootmgr}";
 			Execute("bcdedit", $"/set {fwbootmgr} displayorder {guid} /addfirst", true);
+			WriteLine("Enabled NVRAM entry for HackBGRT with BCDEdit.");
+			// Verify that the entry was created.
+			Execute("bcdedit", "/enum firmware", true);
+			Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", false, DryRun);
+			Execute("bcdedit", $"/enum {guid}", true);
+			Efi.LogBootEntries();
 		} catch (Exception e) {
 			Log($"EnableBCDEdit failed: {e.ToString()}");
 			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
@@ -424,14 +443,18 @@ public class Setup {
 			} else if (entry.IndexOf("HackBGRT") >= 0) {
 				found = true;
 				Log($"Disabling HackBGRT entry {guid}.");
-				if (Execute("bcdedit", $"/delete {guid}", true) == null) {
+				if (!DryRun && Execute("bcdedit", $"/delete {guid}", true) == null) {
 					Log($"DisableBCDEdit failed to delete {guid}.");
+				} else {
+					disabled = true;
 				}
-				disabled = true;
 			}
 		}
-		if (found && !disabled) {
-			throw new SetupException("Failed to disable HackBGRT with BCDEdit!");
+		if (found) {
+			if (!disabled) {
+				throw new SetupException("Failed to disable HackBGRT with BCDEdit!");
+			}
+			WriteLine("Disabled NVRAM entry for HackBGRT with BCDEdit.");
 		}
 	}
 
@@ -439,8 +462,11 @@ public class Setup {
 	 * Enable HackBGRT boot entry.
 	 */
 	protected void EnableEntry() {
-		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
+		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", true, DryRun);
 		WriteLine("Enabled NVRAM entry for HackBGRT.");
+		// Verify that the entry was created.
+		Efi.LogBootEntries();
+		Execute("bcdedit", "/enum firmware", true);
 	}
 
 	/**
@@ -506,7 +532,7 @@ public class Setup {
 	 */
 	protected void VerifyLoaderConfig() {
 		var lines = File.ReadAllLines("config.txt");
-		var loader = lines.Where(s => s.StartsWith("boot=")).Select(s => s.Substring(5)).Prepend("").Last();
+		var loader = lines.Where(s => s.StartsWith("boot=")).Select(s => s.Substring(5)).LastOrDefault();
 		if (loader == null) {
 			throw new SetupException("config.txt does not contain a boot=... line!");
 		}
@@ -570,7 +596,9 @@ public class Setup {
 	protected void Uninstall() {
 		Disable();
 		try {
-			Directory.Delete(InstallPath, true);
+			if (Directory.Exists(InstallPath)) {
+				Directory.Delete(InstallPath, true);
+			}
 			WriteLine($"HackBGRT has been removed from {InstallPath}.");
 		} catch (Exception e) {
 			Log($"Uninstall failed: {e.ToString()}");
@@ -632,8 +660,8 @@ public class Setup {
 			WriteLine("BitLocker status could not be determined.");
 			return;
 		}
-		var reOn = new Regex(@"Conversion Status:\s*(Encr|Fully Encr)|Protection Status:\s*Protection On");
-		var reOff = new Regex(@"Conversion Status:\s*(Fully Decrypted)|Protection Status:\s*Protection Off");
+		var reOn = new Regex(@"Conversion Status:\s*.*Encr|AES");
+		var reOff = new Regex(@"Conversion Status:\s*(Fully Decrypted)|\s0[.,]0\s*%");
 		var isOn = reOn.Match(output).Success;
 		var isOff = reOff.Match(output).Success;
 		if (!isOn && isOff) {
@@ -703,8 +731,13 @@ public class Setup {
 	 * @param arch The architecture.
 	 */
 	protected void SetArch(string arch) {
-		var detectedArch = DetectArchFromOS();
-		if (arch == "") {
+		var detectedArch = Environment.Is64BitOperatingSystem ? "x64" : "ia32";
+		try {
+			detectedArch = DetectArchFromOS();
+		} catch {
+			WriteLine($"Failed to detect OS architecture, assuming {detectedArch}.");
+		}
+		if (arch == "" || arch == null) {
 			EfiArch = detectedArch;
 			WriteLine($"Your OS uses arch={EfiArch}. This will be checked again during installation.");
 		} else {
@@ -776,7 +809,7 @@ public class Setup {
 		WriteLine(" I = install");
 		WriteLine("     - creates a new EFI boot entry for HackBGRT");
 		WriteLine(" J = install (alternative)");
-		WriteLine("     - creates a new EFI boot entry with an alternative method (BCDEdit)");
+		WriteLine("     - creates a new EFI boot entry with an alternative method");
 		WriteLine("     - try this if the first option doesn't work");
 		WriteLine(" O = install (legacy)");
 		WriteLine("     - overwrites the MS boot loader; gets removed by Windows updates");
@@ -796,15 +829,15 @@ public class Setup {
 		var k = Console.ReadKey().Key;
 		Log($"User input: {k}");
 		WriteLine();
-		if (k == ConsoleKey.I || k == ConsoleKey.O || k == ConsoleKey.F) {
+		if (k == ConsoleKey.I || k == ConsoleKey.J || k == ConsoleKey.O || k == ConsoleKey.F) {
 			Configure();
 		}
 		if (k == ConsoleKey.I) {
-			RunPrivilegedActions(new string[] { "install", "enable-entry" });
+			RunPrivilegedActions(new string[] { "install", "disable", "enable-bcdedit" });
 		} else if (k == ConsoleKey.J) {
-			RunPrivilegedActions(new string[] { "install", "enable-bcdedit" });
+			RunPrivilegedActions(new string[] { "install", "disable", "enable-entry" });
 		} else if (k == ConsoleKey.O) {
-			RunPrivilegedActions(new string[] { "install", "enable-overwrite" });
+			RunPrivilegedActions(new string[] { "install", "disable", "enable-overwrite" });
 		} else if (k == ConsoleKey.F) {
 			RunPrivilegedActions(new string[] { "install" });
 		} else if (k == ConsoleKey.D) {
@@ -950,7 +983,7 @@ public class Setup {
 		Batch = args.Contains("batch");
 		ForwardArguments = String.Join(" ", args.Where(s => s == "dry-run" || s == "batch" || s.StartsWith("arch=")));
 		try {
-			SetArch(args.Prepend("arch=").Last(s => s.StartsWith("arch=")).Substring(5));
+			SetArch(args.Where(s => s.StartsWith("arch=")).Select(s => s.Substring(5)).LastOrDefault());
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				WriteLine("This installer needs to be run as administrator!");
 				return 1;
@@ -978,7 +1011,13 @@ public class Setup {
 			WriteLine();
 			WriteLine($"Unexpected error: {e.Message}");
 			Log(e.ToString());
-			WriteLine("If this is the most current release, please report this bug.");
+			if (e is MissingMemberException || e is TypeLoadException) {
+				WriteLine("This installer requires a recent version of .Net Framework.");
+				WriteLine("Use Windows Update or download manually:");
+				WriteLine("https://dotnet.microsoft.com/en-us/download/dotnet-framework");
+			} else {
+				WriteLine("If this is the most current release, please report this bug.");
+			}
 			return 1;
 		} finally {
 			if (DryRun) {
