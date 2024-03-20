@@ -1,3 +1,5 @@
+# for Windows 10 WSL Debian build
+# use Normal GCC
 CC = clang
 CFLAGS = -target $(CLANG_TARGET) -ffreestanding -fshort-wchar
 CFLAGS += -std=c17 -Wshadow -Wall -Wunused -Werror-implicit-function-declaration
@@ -9,18 +11,27 @@ ARCH_CFLAGS = -O2 -mno-red-zone
 GNUEFI_INC = gnu-efi/inc
 
 FILES_C = src/main.c src/util.c src/types.c src/config.c src/sbat.c src/efi.c
+FILES_C += $(wildcard picojpeg/picojpeg.c)
+FILES_C += $(wildcard upng/upng.c)
+FILES_C += $(wildcard my_efilib/my_efilib.c)
 FILES_H = $(wildcard src/*.h)
+# */
+FILES_H += $(wildcard picojpeg/picojpeg.h)
+FILES_H += $(wildcard upng/upng.h)
+FILES_H += $(wildcard my_efilib/my_efilib.h)
 FILES_CS = src/Setup.cs src/Esp.cs src/Efi.cs
 GIT_DESCRIBE := $(firstword $(GIT_DESCRIBE) $(shell git describe --tags) unknown)
 CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)"'
 RELEASE_NAME = HackBGRT-$(GIT_DESCRIBE:v%=%)
 
-EFI_ARCH_LIST = x64 ia32 aa64 arm
+# EFI_ARCH_LIST = x64 ia32 aa64 arm
+EFI_ARCH_LIST = x64
 EFI_SIGNED_FILES = $(patsubst %,efi-signed/boot%.efi,$(EFI_ARCH_LIST))
 
 .PHONY: all efi efi-signed setup release clean
 
-all: efi setup
+# all: efi setup
+all: efi
 	@echo "Run 'make efi-signed' to sign the EFI executables."
 	@echo "Run 'make release' to build a release-ready ZIP archive."
 	@echo "Run 'make run-qemu-<arch>' to test the EFI executables with QEMU."
@@ -40,6 +51,7 @@ release/$(RELEASE_NAME): $(EFI_SIGNED_FILES) certificate.cer config.txt splash.b
 	rm -rf $@
 	tar c --transform=s,^,$@/, $^ | tar x
 
+# */
 release/$(RELEASE_NAME).zip: release/$(RELEASE_NAME)
 	rm -rf $@
 	(cd release; 7z a -mx=9 "$(RELEASE_NAME).zip" "$(RELEASE_NAME)" -bd -bb1)
@@ -120,3 +132,4 @@ run-qemu-aa64: test/esp-aa64 /usr/share/ovmf/aarch64/QEMU_EFI.fd
 run-qemu-arm: test/esp-arm /usr/share/ovmf/arm/QEMU_EFI.fd
 	@echo "Press Ctrl+Alt+2 to switch to QEMU console."
 	qemu-system-arm -machine virt -cpu max $(QEMU_ARGS)
+
