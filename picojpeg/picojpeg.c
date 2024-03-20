@@ -345,57 +345,15 @@ static PJPG_INLINE uint8 getBit(void)
    return ret;
 }
 //------------------------------------------------------------------------------
-static uint16 getExtendTest(uint8 i)
-{
-   switch (i)
-   {
-      case 0: return 0;
-      case 1: return 0x0001;
-      case 2: return 0x0002;
-      case 3: return 0x0004;
-      case 4: return 0x0008;
-      case 5: return 0x0010; 
-      case 6: return 0x0020;
-      case 7: return 0x0040;
-      case 8:  return 0x0080;
-      case 9:  return 0x0100;
-      case 10: return 0x0200;
-      case 11: return 0x0400;
-      case 12: return 0x0800;
-      case 13: return 0x1000;
-      case 14: return 0x2000; 
-      case 15: return 0x4000;
-      default: return 0;
-   }      
-}
-//------------------------------------------------------------------------------
-static int16 getExtendOffset(uint8 i)
-{ 
-   switch (i)
-   {
-      case 0: return 0;
-      case 1: return ((-1)<<1) + 1; 
-      case 2: return ((-1)<<2) + 1; 
-      case 3: return ((-1)<<3) + 1; 
-      case 4: return ((-1)<<4) + 1; 
-      case 5: return ((-1)<<5) + 1; 
-      case 6: return ((-1)<<6) + 1; 
-      case 7: return ((-1)<<7) + 1; 
-      case 8: return ((-1)<<8) + 1; 
-      case 9: return ((-1)<<9) + 1;
-      case 10: return ((-1)<<10) + 1; 
-      case 11: return ((-1)<<11) + 1; 
-      case 12: return ((-1)<<12) + 1; 
-      case 13: return ((-1)<<13) + 1; 
-      case 14: return ((-1)<<14) + 1; 
-      case 15: return ((-1)<<15) + 1;
-      default: return 0;
-   }
-};
-//------------------------------------------------------------------------------
 static PJPG_INLINE int16 huffExtend(uint16 x, uint8 s)
 {
-   return ((x < getExtendTest(s)) ? ((int16)x + getExtendOffset(s)) : (int16)x);
+   // https://android.googlesource.com/platform/external/dng_sdk/+/refs/heads/master/source/dng_lossless_jpeg.cpp
+   // inline void dng_lossless_decoder::HuffExtend (int32 &x, int32 s)
+   // ExtendTest
+   if (x < (0x08000u >> (16 - s))) {
+      x += -(1 << s) + 1; // ExtendOffset
+   }
+   return (int16)x;
 }
 //------------------------------------------------------------------------------
 static PJPG_INLINE uint8 huffDecode(const HuffTable* pHuffTable, const uint8* pHuffVal)
