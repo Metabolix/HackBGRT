@@ -3,6 +3,8 @@
 
 #include "my_efilib.h"
 
+extern EFI_BOOT_SERVICES        *BS;
+
 // #include <stdlib.h>
 // Memory Allocation
 void *malloc(size_t size) {
@@ -20,7 +22,7 @@ void *calloc(size_t nmemb, size_t size) {
 }
 
 void free(void *ptr) {
-	FreePool(ptr);
+	BS->FreePool(ptr);
 }
 
 void *realloc(void *ptr, size_t size) {
@@ -44,5 +46,10 @@ int memcmp(const void *cs, const void *ct, size_t count) {
 	}
 
 	return res;
+}
+
+// lld-link: error: undefined symbol: __chkstk
+void __chkstk(void *ptr) {
+	;
 }
 

@@ -1,8 +1,8 @@
 // Created by FREE WING,Y.Sakamoto
 // http://www.neko.ne.jp/~freewing/
 
-#include <efi.h>
-#include <efilib.h>
+#include "efi.h"
+// #include <efilib.h>
 
 // #include <limits.h>
 #ifndef INT_MAX
