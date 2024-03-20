@@ -620,7 +620,7 @@ static uint g_nInFileOfs;
 unsigned char pjpeg_need_bytes_callback(unsigned char* pBuf, unsigned char buf_size, unsigned char *pBytes_actually_read, void *pCallback_data)
 {
    uint n;
-   pCallback_data;
+   // pCallback_data;
 
    n = min(g_nInFileSize - g_nInFileOfs, buf_size);
 
