@@ -1,60 +1,3 @@
-<<<<<<< HEAD
-# for Windows 10 WSL Debian build
-# use Normal GCC
-CROSS_COMPILE =
-# PREFIX=/usr/local/
-PREFIX = ./gnu-efi/usr/local/
-TARGET = HackBGRT_MULTI_$(ARCH)
-_OBJS = main.o config.o types.o util.o sbat.o
-_OBJS += picojpeg.o
-_OBJS += upng.o
-_OBJS += my_efilib.o
-ODIR = obj
-SDIR = src
-OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
-ARCH = x86_64
-
-CC  = $(CROSS_COMPILE)gcc
-LD  = $(CROSS_COMPILE)ld
-OBJCOPY = $(CROSS_COMPILE)objcopy
-
-# Linker script
-LDSCRIPT = $(PREFIX)/lib/elf_$(ARCH)_efi.lds
-# PE header and startup code
-STARTOBJ = $(PREFIX)/lib/crt0-efi-$(ARCH).o
-# include header
-EFI_INCLUDE = $(PREFIX)/include/efi/
-INCLUDES = -I. \
-	-I$(EFI_INCLUDE) \
-	-I$(EFI_INCLUDE)/$(ARCH) \
-	-I$(EFI_INCLUDE)/protocol
-
-# CFLAGS
-CFLAGS = -std=c11 -O2 -ffreestanding -mno-red-zone -fno-stack-protector \
-	-Wshadow -Wall -Wunused -Werror-implicit-function-declaration \
-	-DCONFIG_$(GNUEFI_ARCH) -DGNU_EFI_USE_MS_ABI \
-	-fpic -D__KERNEL__ \
-	-maccumulate-outgoing-args \
-	-fshort-wchar -fno-strict-aliasing \
-	-fno-merge-all-constants -fno-stack-check
-# -Werror
-GIT_DESCRIBE = $(firstword $(shell git describe --tags) unknown)
-CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)"'
-
-# LDFLAGS
-LDFLAGS = -nostdlib --warn-common --no-undefined \
-	--fatal-warnings --build-id=sha1 \
-	-shared -Bsymbolic
-# set EFI_SUBSYSTEM: Application(0x0a)
-LDFLAGS += --defsym=EFI_SUBSYSTEM=0x0a
-LDFLAGS += -L$(PREFIX)/lib
-# ld: warning: ./gnu-efi/usr/local//lib/crt0-efi-x86_64.o: missing .note.GNU-stack section implies executable stack
-# ld: NOTE: This behaviour is deprecated and will be removed in a future version of the linker
-LDFLAGS += -z noexecstack
-
-
-####### rules #########
-=======
 CC = clang
 CFLAGS = -target $(CLANG_TARGET) -ffreestanding -fshort-wchar
 CFLAGS += -std=c17 -Wshadow -Wall -Wunused -Werror-implicit-function-declaration
@@ -100,56 +43,25 @@ release/$(RELEASE_NAME): $(EFI_SIGNED_FILES) certificate.cer config.txt splash.b
 release/$(RELEASE_NAME).zip: release/$(RELEASE_NAME)
 	rm -rf $@
 	(cd release; 7z a -mx=9 "$(RELEASE_NAME).zip" "$(RELEASE_NAME)" -bd -bb1)
->>>>>>> master
 
-all: $(TARGET).efi
+src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
+	echo 'public class GIT_DESCRIBE { public const string data = "$(GIT_DESCRIBE)"; }' > $@
 
-<<<<<<< HEAD
-# rebuild shared object to PE binary
-$(TARGET).efi: $(TARGET).so
-	$(OBJCOPY) \
-		-j .text  \
-		-j .sdata \
-		-j .data  \
-		-j .dynamic \
-		-j .dynsym \
-		-j .rel    \
-		-j .rela   \
-		-j .rel.*  \
-		-j .rela.* \
-		-j .rel*   \
-		-j .rela*  \
-		-j .reloc  \
-		-O binary  \
-		--target efi-app-$(ARCH) \
-		$(TARGET).so $@
-=======
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
 	csc /nologo /define:GIT_DESCRIBE /out:$@ $^
->>>>>>> master
 
-# build shared object
-$(TARGET).so: $(OBJS)
-	$(LD) $(LDFLAGS) $(STARTOBJ) $^ -o $@ \
-		-lefi -lgnuefi \
-		-T $(LDSCRIPT)
+certificate.cer pki:
+	@echo
+	@echo "You need proper keys to sign the EFI executables."
+	@echo "Example:"
+	@echo "mkdir -p pki"
+	@echo "certutil --empty-password -N -d pki"
+	@echo "efikeygen -d pki -n HackBGRT-signer -S -k -c 'CN=HackBGRT Secure Boot Signer,OU=HackBGRT,O=Unknown,MAIL=unknown@example.com' -u 'URL'"
+	@echo "certutil -d pki -n HackBGRT-signer -Lr > certificate.cer"
+	@echo "Modify and run the commands yourself."
+	@echo
+	@false
 
-<<<<<<< HEAD
-./obj/%.o: ./src/%.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# PNG upng
-./obj/%.o: ./upng/%.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# JPEG picojpeg
-./obj/%.o: ./picojpeg/%.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-# my_efilib
-./obj/%.o: ./my_efilib/%.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-=======
 efi-signed/%.efi: efi/%.efi pki
 	@mkdir -p efi-signed
 	pesign --force -n pki -i $< -o $@ -c HackBGRT-signer -s
@@ -175,13 +87,8 @@ efi/bootarm.efi: $(FILES_C)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 	@echo "Fix $@ architecture code (IMAGE_FILE_MACHINE_ARMTHUMB_MIXED = 0x01C2)"
 	echo -en "\xc2\x01" | dd of=$@ bs=1 seek=124 count=2 conv=notrunc status=none
->>>>>>> master
 
-# clean rule
 clean:
-<<<<<<< HEAD
-	rm -f ./obj/*.o *.so s*.efi
-=======
 	rm -rf setup.exe efi efi-signed
 	rm -f src/GIT_DESCRIBE.cs
 	rm -rf release
@@ -213,4 +120,3 @@ run-qemu-aa64: test/esp-aa64 /usr/share/ovmf/aarch64/QEMU_EFI.fd
 run-qemu-arm: test/esp-arm /usr/share/ovmf/arm/QEMU_EFI.fd
 	@echo "Press Ctrl+Alt+2 to switch to QEMU console."
 	qemu-system-arm -machine virt -cpu max $(QEMU_ARGS)
->>>>>>> master
