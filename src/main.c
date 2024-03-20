@@ -231,7 +231,7 @@ static void plot_dot(const uint32_t x, const uint32_t y, const UINT8 r, const UI
 /**
  * Load a PNG image file
  *
- * @param root_dir The root directory for loading a PNG.
+ * @param base_dir The root directory for loading a PNG.
  * @param path The PNG path within the root directory.
  * @return The loaded BMP, or 0 if not available.
  */
@@ -242,19 +242,19 @@ static void* init_bmp(uint32_t w, uint32_t h)
 {
 	BMP* bmp = 0;
 
-	Log(config.debug, L"HackBGRT: init_bmp() (%d x %d).\n", w, h);
+	Log(config.debug, L"init_bmp() (%d x %d).\n", w, h);
 
 	// 3 = RGB 3byte
 	// 54 = 24bit BMP has 54byte header
 	// Padding for 4 byte alignment
 	// const int pad = (w & 3);
 	const UINT32 size = ((w * 3) + (w & 3)) * h + 54;
-	Log(config.debug, L"HackBGRT: init_bmp() AllocatePool %ld.\n", size);
+	Log(config.debug, L"init_bmp() AllocatePool %ld.\n", size);
 	BS->AllocatePool(EfiBootServicesData, size, (void*)&bmp);
 	if (!bmp) return 0;
 
 	// BI_RGB 24bit
-	CopyMem(
+	BS->CopyMem(
 		bmp,
 		"\x42\x4d"
 		"\x00\x00\x00\x00"
@@ -294,26 +294,26 @@ static void* decode_png(void* buffer, UINTN size)
 
 	upng = upng_new_from_bytes(buffer, size);
 	if (!upng) {
-		Print(L"HackBGRT: Failed to upng NULL\n");
+		Log(config.debug, L"Failed to upng NULL\n");
 		return 0;
 	}
 
 	if (upng_get_error(upng) != UPNG_EOK) {
-		Print(L"HackBGRT: Failed to upng %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
+		Log(config.debug, L"Failed to upng %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
 		upng_free(upng);
 		return 0;
 	}
 
 	// Reads just the header, sets image properties
 	if (upng_header(upng) != UPNG_EOK) {
-		Print(L"HackBGRT: Failed to upng_header %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
+		Log(config.debug, L"Failed to upng_header %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
 		upng_free(upng);
 		return 0;
 	}
 
 	// Decodes image data
 	if (upng_decode(upng) != UPNG_EOK) {
-		Print(L"HackBGRT: Failed to upng_decode %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
+		Log(config.debug, L"Failed to upng_decode %u %u\n", upng_get_error(upng), upng_get_error_line(upng));
 		upng_free(upng);
 		return 0;
 	}
@@ -325,7 +325,7 @@ static void* decode_png(void* buffer, UINTN size)
 
 	BMP* bmp = init_bmp(width, height);
 	if (!bmp) {
-		Print(L"HackBGRT: Failed to init_bmp\n");
+		Log(config.debug, L"Failed to init_bmp\n");
 		upng_free(upng);
 		return 0;
 	}
@@ -381,14 +381,14 @@ static void* decode_png(void* buffer, UINTN size)
 	}
 
 	if (!decode_type) {
-		Print(L"HackBGRT: No Support PNG format %u\n", upng_get_format(upng));
+		Log(config.debug, L"No Support PNG format %u\n", upng_get_format(upng));
 		upng_free(upng);
 		return 0;
 	}
 
 	const unsigned char* upng_palette = upng_get_palette(upng);
 	if (is_index_color && !upng_palette) {
-		Print(L"HackBGRT: Error No PLTE chunk Index Color Palette\n");
+		Log(config.debug, L"Error No PLTE chunk Index Color Palette\n");
 		upng_free(upng);
 		return 0;
 	}
@@ -503,7 +503,7 @@ static void* decode_png(void* buffer, UINTN size)
 			UINT8 r = ((UINT8*)bmp)[--bmp_pos];
 			UINT8 g = ((UINT8*)bmp)[--bmp_pos];
 			UINT8 b = ((UINT8*)bmp)[--bmp_pos];
-			Log(config.debug, L"HackBGRT: bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
+			Log(config.debug, L"bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
 		}
 	}
 
@@ -513,21 +513,21 @@ static void* decode_png(void* buffer, UINTN size)
 	return bmp;
 }
 
-static BMP* LoadPNG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
+static BMP* LoadPNG(EFI_FILE_HANDLE base_dir, const CHAR16* path) {
 	void* buffer = 0;
-	Log(config.debug, L"HackBGRT: Loading PNG %s.\n", path);
+	Log(config.debug, L"Loading PNG %s.\n", path);
 	UINTN size;
-	buffer = LoadFile(root_dir, path, &size);
+	buffer = LoadFile(base_dir, path, &size);
 	if (!buffer) {
-		Print(L"HackBGRT: Failed to load PNG (%s)!\n", path);
+		Log(config.debug, L"Failed to load PNG (%s)!\n", path);
 		BS->Stall(1000000);
 		return 0;
 	}
 
 	BMP* bmp = decode_png(buffer, size);
 	if (!bmp) {
-		FreePool(buffer);
-		Print(L"HackBGRT: Failed to decoce PNG (%s)!\n", path);
+		BS->FreePool(buffer);
+		Log(config.debug, L"Failed to decoce PNG (%s)!\n", path);
 		BS->Stall(1000000);
 		return 0;
 	}
@@ -668,11 +668,11 @@ uint8 *pjpeg_load_from_file(void* buffer, UINTN size, int *ix, int *iy, int *com
    status = pjpeg_decode_init(&image_info, pjpeg_need_bytes_callback, NULL, (unsigned char)reduce);
    if (status)
    {
-      Print(L"pjpeg_decode_init() failed with status %u(%s)\n", status, stringtoC16(PJPG_ERROR_MESSAGE[status]));
+      Log(config.debug, L"pjpeg_decode_init() failed with status %u(%s)\n", status, stringtoC16(PJPG_ERROR_MESSAGE[status]));
 
       if (status == PJPG_UNSUPPORTED_MODE)
       {
-         Print(L"Progressive JPEG files are not supported.\n");
+         Log(config.debug, L"Progressive JPEG files are not supported.\n");
       }
 
       free(g_pInFile);
@@ -709,7 +709,7 @@ uint8 *pjpeg_load_from_file(void* buffer, UINTN size, int *ix, int *iy, int *com
       {
          if (status != PJPG_NO_MORE_BLOCKS)
          {
-            Print(L"pjpeg_decode_mcu() failed with status %u\n", status);
+            Log(config.debug, L"pjpeg_decode_mcu() failed with status %u\n", status);
 
             free(pImage);
             free(g_pInFile);
@@ -867,7 +867,7 @@ static void* decode_jpeg(void* buffer, UINTN size)
    pImage = pjpeg_load_from_file(buffer, size, &width, &height, &comps, &scan_type, reduce);
    if (!pImage)
    {
-      Print(L"Failed loading source image!\n");
+      Log(config.debug, L"Failed loading source image!\n");
       return EXIT_FAILURE;
    }
 
@@ -885,7 +885,7 @@ static void* decode_jpeg(void* buffer, UINTN size)
 
 	BMP* bmp = init_bmp(width, height);
 	if (!bmp) {
-		Print(L"HackBGRT: Failed to init_bmp\n");
+		Log(config.debug, L"Failed to init_bmp\n");
 		free(pImage);
 		return 0;
 	}
@@ -899,7 +899,7 @@ static void* decode_jpeg(void* buffer, UINTN size)
 			get_pixel(a, &pImage[pImagePos], (scan_type == PJPG_GRAYSCALE), comps);
             pImagePos += comps;
 
-			// Log(config.debug, L"HackBGRT: bmp (%4d, %4d) #%04x.\n", x, y, a[0]);
+			// Log(config.debug, L"bmp (%4d, %4d) #%04x.\n", x, y, a[0]);
 
 			UINT32 bmp_pos = bmp_width * (height - y - 1) + (x * 3) + 54;
 			for (d = 2; d >= 0; --d) {
@@ -925,7 +925,7 @@ static void* decode_jpeg(void* buffer, UINTN size)
 			UINT8 r = ((UINT8*)bmp)[--bmp_pos];
 			UINT8 g = ((UINT8*)bmp)[--bmp_pos];
 			UINT8 b = ((UINT8*)bmp)[--bmp_pos];
-			Log(config.debug, L"HackBGRT: bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
+			Log(config.debug, L"bmp (%4d, %4d) #%02x%02x%02x.\n", x, y, r, g, b);
 		}
 	}
 
@@ -934,21 +934,21 @@ static void* decode_jpeg(void* buffer, UINTN size)
    return bmp;
 }
 
-static BMP* LoadJPEG(EFI_FILE_HANDLE root_dir, const CHAR16* path) {
+static BMP* LoadJPEG(EFI_FILE_HANDLE base_dir, const CHAR16* path) {
     void* buffer = 0;
-    Log(config.debug, L"HackBGRT: Loading JPEG %s.\n", path);
+    Log(config.debug, L"Loading JPEG %s.\n", path);
     UINTN size;
-    buffer = LoadFile(root_dir, path, &size);
+    buffer = LoadFile(base_dir, path, &size);
     if (!buffer) {
-        Print(L"HackBGRT: Failed to load JPEG (%s)!\n", path);
+        Log(config.debug, L"Failed to load JPEG (%s)!\n", path);
         BS->Stall(1000000);
         return 0;
     }
 
     BMP* bmp = decode_jpeg(buffer, size);
     if (!bmp) {
-        FreePool(buffer);
-        Print(L"HackBGRT: Failed to decoce JPEG (%s)!\n", path);
+        BS->FreePool(buffer);
+        Log(config.debug, L"Failed to decoce JPEG (%s)!\n", path);
         BS->Stall(1000000);
         return 0;
     }
@@ -1005,62 +1005,48 @@ static BMP* LoadBMP(EFI_FILE_HANDLE base_dir, const CHAR16* path) {
 	if (!path) {
 		return MakeBMP(1, 1, 0, 0, 0); // empty path = black image
 	}
-<<<<<<< HEAD
-	Log(config.debug, L"HackBGRT: Loading %s.\n", path);
+	Log(config.debug, L"Loading %s.\n", path);
 	BMP* bmp = 0;
 	UINTN len = StrLen(path);
 	CHAR16 last_char_2 = path[len - 2];
-	Log(config.debug, L"HackBGRT: Filename Len %d, Last Char %c.\n", (int)len, last_char_2);
+	Log(config.debug, L"Filename Len %d, Last Char %c.\n", (int)len, last_char_2);
 	if (last_char_2 == 'm' || last_char_2 == 'M') {
 		// xxx.BMP
 		UINTN size = 0;
-		bmp = LoadFile(root_dir, path, &size);
+		bmp = LoadFile(base_dir, path, &size);
 		if (bmp) {
-			if (size >= bmp->file_size && CompareMem(bmp, "BM", 2) == 0 && bmp->file_size - bmp->pixel_data_offset > 4 && bmp->width && bmp->height && (bmp->bpp == 32 || bmp->bpp == 24) && bmp->compression == 0) {
+			if (size >= bmp->file_size
+			&& CompareMem(bmp, "BM", 2) == 0
+			&& bmp->file_size > bmp->pixel_data_offset
+			&& bmp->width > 0
+			&& bmp->height > 0
+			&& (bmp->bpp == 32 || bmp->bpp == 24)
+			&& bmp->height * (-(-(bmp->width * (bmp->bpp / 8)) & ~3)) <= bmp->file_size - bmp->pixel_data_offset
+			&& bmp->compression == 0) {
 				// return bmp;
 			} else {
-				FreePool(bmp);
-				Log(1, L"HackBGRT: Invalid BMP (%s)!\n", path);
+				BS->FreePool(bmp);
+				Log(1, L"Invalid BMP (%s)!\n", path);
 				bmp = 0;
 			}
 		} else {
-			Log(1, L"HackBGRT: Failed to load BMP (%s)!\n", path);
+			Log(1, L"Failed to load BMP (%s)!\n", path);
 		}
 	} else if (last_char_2 == 'n' || last_char_2 == 'N') {
 		// xxx.PNG
-		bmp = LoadPNG(root_dir, path);
+		bmp = LoadPNG(base_dir, path);
 	} else {
 		// xxx.JPG
 		// xxx.JPEG
-		bmp = LoadJPEG(root_dir, path);
-=======
-	Log(config.debug, L"Loading %s.\n", path);
-	UINTN size = 0;
-	BMP* bmp = LoadFile(base_dir, path, &size);
-	if (bmp) {
-		if (size >= bmp->file_size
-		&& CompareMem(bmp, "BM", 2) == 0
-		&& bmp->file_size > bmp->pixel_data_offset
-		&& bmp->width > 0
-		&& bmp->height > 0
-		&& (bmp->bpp == 32 || bmp->bpp == 24)
-		&& bmp->height * (-(-(bmp->width * (bmp->bpp / 8)) & ~3)) <= bmp->file_size - bmp->pixel_data_offset
-		&& bmp->compression == 0) {
-			return bmp;
-		}
-		BS->FreePool(bmp);
-		Log(1, L"Invalid BMP (%s)!\n", path);
-	} else {
-		Log(1, L"Failed to load BMP (%s)!\n", path);
->>>>>>> master
+		bmp = LoadJPEG(base_dir, path);
 	}
 	if (bmp) {
-		Log(config.debug, L"HackBGRT: Load Success %s.\n", path);
+		Log(config.debug, L"Load Success %s.\n", path);
 
 		return bmp;
 	}
 
-	Log(1, L"HackBGRT: Failed to load IMAGE (%s)!\n", path);
+	Log(1, L"Failed to load IMAGE (%s)!\n", path);
 	BS->Stall(1000000);
 	return MakeBMP(16, 16, 255, 0, 0); // error = red image
 }
@@ -1205,10 +1191,6 @@ static EFI_HANDLE LoadApp(int print_failure, EFI_HANDLE image_handle, EFI_LOADED
 /**
  * The main program.
  */
-<<<<<<< HEAD
-EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
-	InitializeLib(image_handle, ST_);
-=======
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	ST = ST_;
 	BS = ST_->BootServices;
@@ -1218,7 +1200,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	ST->ConOut->EnableCursor(ST->ConOut, 0);
 	ST->ConOut->ClearScreen(ST->ConOut);
 
->>>>>>> master
 	Log(0, L"HackBGRT version: %s\n", version);
 
 	EFI_LOADED_IMAGE* image;
@@ -1323,15 +1304,4 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		return 1;
 	}
 }
-<<<<<<< HEAD
 
-/**
- * Forward to EfiMain.
- *
- * Some compilers and architectures differ in underscore handling. This helps.
- */
-// EFI_STATUS EFIAPI _EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
-// 	return EfiMain(image_handle, ST_);
-// }
-=======
->>>>>>> master
