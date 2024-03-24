@@ -144,10 +144,9 @@ public class Setup {
 	 *
 	 * @param app Path to the application.
 	 * @param args The argument string.
-	 * @param nullOnFail If set, return null if the program exits with a code other than 0, even if there was some output.
-	 * @return The output, or null if the execution failed.
+	 * @return The output and exit code.
 	 */
-	public static string Execute(string app, string args, bool nullOnFail) {
+	public static (string Output, int ExitCode) Execute(string app, string args) {
 		Log($"Execute: {app} {args}");
 		try {
 			var info = new ProcessStartInfo(app, args);
@@ -157,11 +156,24 @@ public class Setup {
 			string output = p.StandardOutput.ReadToEnd();
 			p.WaitForExit();
 			Log($"Exit code: {p.ExitCode}, output:\n{output}\n\n");
-			return (nullOnFail && p.ExitCode != 0) ? null : output;
+			return (output, p.ExitCode);
 		} catch (Exception e) {
 			Log($"Execute failed: {e.ToString()}");
-			return null;
+			return (null, -1);
 		}
+	}
+
+	/**
+	 * Execute another process, return the output.
+	 *
+	 * @param app Path to the application.
+	 * @param args The argument string.
+	 * @param nullOnFail If set, return null if the program exits with a code other than 0, even if there was some output.
+	 * @return The output, or null if the execution failed.
+	 */
+	public static string Execute(string app, string args, bool nullOnFail) {
+		var result = Execute(app, args);
+		return (nullOnFail && result.ExitCode != 0) ? null : result.Output;
 	}
 
 	/**
@@ -403,9 +415,27 @@ public class Setup {
 			WriteLine("Dry run, skip enabling with BCDEdit.");
 			return;
 		}
+		var bcdeditEnum = Execute("bcdedit", "/enum firmware");
+		if (bcdeditEnum.ExitCode != 0) {
+			WriteLine("BCDEdit is not working. Fix it or try another method.");
+			if (bcdeditEnum.Output != null) {
+				var lastLine = bcdeditEnum.Output.Split("\n".ToCharArray()).Last();
+				WriteLine($"BCDEdit output: {lastLine}");
+				WriteLine("Disable antivirus, check your hard disk, or search 'how to fix 0x800703EE'.");
+			}
+			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
+		}
 		try {
 			var re = new Regex("[{][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[}]");
-			var guid = re.Match(Execute("bcdedit", "/copy {bootmgr} /d HackBGRT", true)).Value;
+			var bcdCopy = Execute("bcdedit", "/copy {bootmgr} /d HackBGRT").Output;
+			if (bcdCopy == null) {
+				throw new SetupException("Failed to create a new BCDEdit entry for HackBGRT!");
+			}
+			var match = re.Match(bcdCopy);
+			if (!match.Success) {
+				throw new SetupException("Failed to get a GUID for the new BCDEdit entry for HackBGRT!");
+			}
+			var guid = match.Value;
 			Execute("bcdedit", $"/set {guid} device partition={Esp.Location}", true);
 			Execute("bcdedit", $"/set {guid} path \\EFI\\HackBGRT\\loader.efi", true);
 			foreach (var arg in new string[] { "locale", "inherit", "default", "resumeobject", "displayorder", "toolsdisplayorder", "timeout" }) {
