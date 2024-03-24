@@ -99,7 +99,13 @@ public class Efi {
 				if (len < 4 || pos + len > pathNodesEnd) {
 					return; // throw new Exception("Bad entry.");
 				}
-				DevicePathNodes.Add(new DevicePathNode(data.Skip(pos).Take(len).ToArray()));
+				var node = new DevicePathNode(data.Skip(pos).Take(len).ToArray());
+				DevicePathNodes.Add(node);
+				if (node.Type == 0x7f && node.SubType == 0xff) {
+					// End of entire device path.
+					// Apparently some firmwares produce paths with unused nodes at the end.
+					break;
+				}
 				pos += len;
 			}
 			Arguments = data.Skip(pathNodesEnd).ToArray();
