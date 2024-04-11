@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.4.1 - 2024-04-11
+
+### Fixed
+- Report better if BCDEdit is unable to operate.
+- Improve support for non-BCDEdit boot entries.
+- Remove old version before copying any new files.
+
 ## 2.4.0 - 2023-12-31
 
 ### Fixed
