@@ -863,13 +863,13 @@ public class Setup {
 			Configure();
 		}
 		if (k == ConsoleKey.I) {
-			RunPrivilegedActions(new string[] { "install", "disable", "enable-bcdedit" });
+			RunPrivilegedActions(new string[] { "disable", "install", "enable-bcdedit" });
 		} else if (k == ConsoleKey.J) {
-			RunPrivilegedActions(new string[] { "install", "disable", "enable-entry" });
+			RunPrivilegedActions(new string[] { "disable", "install", "enable-entry" });
 		} else if (k == ConsoleKey.O) {
-			RunPrivilegedActions(new string[] { "install", "disable", "enable-overwrite" });
+			RunPrivilegedActions(new string[] { "disable", "install", "enable-overwrite" });
 		} else if (k == ConsoleKey.F) {
-			RunPrivilegedActions(new string[] { "install" });
+			RunPrivilegedActions(new string[] { "disable-overwrite", "install" });
 		} else if (k == ConsoleKey.D) {
 			RunPrivilegedActions(new string[] { "disable" });
 		} else if (k == ConsoleKey.R) {
