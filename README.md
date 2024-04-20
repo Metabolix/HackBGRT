@@ -26,13 +26,13 @@ The *shim* boot loader is maintained by Red Hat, Inc, and the included signed co
 
 * Get the latest release from the Releases page.
 * Start `setup.exe` and follow the instructions.
-	* The installer will launch Paint for editing the image.
-	* If Windows later restores the original boot loader, just reinstall.
-	* If you wish to change the image or other configuration, just reinstall.
+	* The installer will launch Paint for editing the image, or you can edit it otherwise.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
 	* Read the instructions in [shim.md](shim.md).
 	* Check the common [troubleshooting](#troubleshooting) to be prepared.
 	* Reboot your computer.
+* If Windows later restores the original boot loader, just reinstall.
+* If you wish to change the image or configuration later, choose the option to only install files.
 
 ### Quiet (batch) installation
 
