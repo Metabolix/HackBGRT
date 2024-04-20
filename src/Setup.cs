@@ -326,7 +326,7 @@ public class Setup {
 				throw new SetupException($"Failed to install image {name} to {newName}.");
 			}
 		}
-		WriteLine($"Installed image {name} to {newName}.");
+		WriteLine($"Installed image {name} to {newName}, size {img.Width}x{img.Height}.");
 	}
 
 	/**
