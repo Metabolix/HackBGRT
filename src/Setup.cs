@@ -524,10 +524,21 @@ public class Setup {
 	}
 
 	/**
+	 * Get paths related to MS boot loader.
+	 */
+	protected (string Ms, string MsDir, string MsGrub, string MsMokManager) GetMsLoaderPaths() {
+		var ms = Esp.MsLoaderPath;
+		var msDir = Path.GetDirectoryName(ms);
+		var msGrub = Path.Combine(msDir, $"grub{EfiArch}.efi");
+		var msMm = Path.Combine(msDir, $"mm{EfiArch}.efi");
+		return (ms, msDir, msGrub, msMm);
+	}
+
+	/**
 	 * Enable HackBGRT by overwriting the MS boot loader.
 	 */
 	protected void OverwriteMsLoader() {
-		var ms = Esp.MsLoaderPath;
+		var (ms, msDir, msGrub, msMm) = GetMsLoaderPaths();
 		var backup = BackupLoaderPath;
 
 		if (DetectLoader(ms) == BootLoaderType.Microsoft) {
@@ -537,13 +548,16 @@ public class Setup {
 			// Duplicate check, but better to be sure...
 			throw new SetupException("Missing MS boot loader backup!");
 		}
-		var msDir = Path.GetDirectoryName(ms);
-		var msGrub = Path.Combine(msDir, $"grub{EfiArch}.efi");
-		var msMm = Path.Combine(msDir, $"mm{EfiArch}.efi");
+		var loader = Path.Combine(InstallPath, "loader.efi");
+		if (SkipShim == (DetectLoader(loader) == BootLoaderType.Shim)) {
+			throw new SetupException("Bad skip-shim usage. Install and enable with consistent options.");
+		}
 		try {
-			InstallFile(Path.Combine(InstallPath, "loader.efi"), ms, false);
-			InstallFile(Path.Combine(InstallPath, $"grub{EfiArch}.efi"), msGrub, false);
-			InstallFile(Path.Combine(InstallPath, $"mm{EfiArch}.efi"), msMm, false);
+			InstallFile(loader, ms, false);
+			if (!SkipShim) {
+				InstallFile(Path.Combine(InstallPath, $"grub{EfiArch}.efi"), msGrub, false);
+				InstallFile(Path.Combine(InstallPath, $"mm{EfiArch}.efi"), msMm, false);
+			}
 		} catch (SetupException e) {
 			WriteLine(e.Message);
 			if (DetectLoader(ms) != BootLoaderType.Microsoft) {
@@ -554,6 +568,7 @@ public class Setup {
 					throw new SetupException("Rollback failed, your system may be unbootable! Create a rescue disk IMMEADIATELY!");
 				}
 			}
+			throw e;
 		}
 	}
 
@@ -561,11 +576,13 @@ public class Setup {
 	 * Restore the MS boot loader if it was previously replaced.
 	 */
 	protected void RestoreMsLoader() {
-		var ms = Esp.MsLoaderPath;
+		var (ms, msDir, msGrub, msMm) = GetMsLoaderPaths();
 		if (DetectLoader(ms) == BootLoaderType.Own || DetectLoader(ms) == BootLoaderType.Shim) {
 			WriteLine("Disabling an old version of HackBGRT.");
 			InstallFile(BackupLoaderPath, ms, false);
 			WriteLine($"{ms} has been restored.");
+			File.Delete(msGrub);
+			File.Delete(msMm);
 		}
 		if (DetectLoader(BackupLoaderPath) == BootLoaderType.Own) {
 			File.Delete(BackupLoaderPath);
