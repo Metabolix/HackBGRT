@@ -59,12 +59,8 @@ public class Setup {
 	}
 
 	/** @var The privileged actions. */
-	protected static readonly string[] privilegedActions = new string[] {
+	protected static readonly string[] PrivilegedActions = new string[] {
 		"install",
-		"allow-secure-boot",
-		"allow-bitlocker",
-		"allow-bad-loader",
-		"skip-shim",
 		"enable-entry", "disable-entry",
 		"enable-bcdedit", "disable-bcdedit",
 		"enable-overwrite", "disable-overwrite",
@@ -72,6 +68,16 @@ public class Setup {
 		"uninstall",
 		"boot-to-fw",
 		"show-boot-log",
+	};
+
+	/** @var Forwardable arguments. */
+	protected static readonly string[] ForwardableArguments = new string[] {
+		"dry-run",
+		"batch",
+		"skip-shim",
+		"allow-secure-boot",
+		"allow-bitlocker",
+		"allow-bad-loader",
 	};
 
 	/** @var The target directory. */
@@ -98,6 +104,18 @@ public class Setup {
 
 	/** @var Run in batch mode? */
 	protected bool Batch;
+
+	/** @var Skip the shim? */
+	protected bool SkipShim;
+
+	/** @var Allow Secure Boot to be enabled? */
+	protected bool AllowSecureBoot;
+
+	/** @var Allow BitLocker to be enabled? */
+	protected bool AllowBitLocker;
+
+	/** @var Allow bad loader in config file? */
+	protected bool AllowBadLoader;
 
 	/** @var Is the loader signed? */
 	protected bool LoaderIsSigned = false;
@@ -331,10 +349,8 @@ public class Setup {
 
 	/**
 	 * Install files to ESP.
-	 *
-	 * @param skipShim Whether to skip installing shim.
 	 */
-	protected void InstallFiles(bool skipShim) {
+	protected void InstallFiles() {
 		var loaderSource = Path.Combine("efi-signed", $"boot{EfiArch}.efi");
 		LoaderIsSigned = true;
 		if (!File.Exists(loaderSource)) {
@@ -346,7 +362,7 @@ public class Setup {
 		}
 		var shimSource = Path.Combine("shim-signed", $"shim{EfiArch}.efi");
 		var mmSource = Path.Combine("shim-signed", $"mm{EfiArch}.efi");
-		if (!skipShim) {
+		if (!SkipShim) {
 			if (!File.Exists(shimSource)) {
 				throw new SetupException($"Missing shim ({shimSource}), can't install shim for {EfiArch}!");
 			}
@@ -379,7 +395,7 @@ public class Setup {
 			}
 		}
 		var loaderDest = "loader.efi";
-		if (!skipShim) {
+		if (!SkipShim) {
 			InstallFile(shimSource, loaderDest);
 			InstallFile(mmSource, $"mm{EfiArch}.efi");
 			loaderDest = $"grub{EfiArch}.efi";
@@ -393,7 +409,7 @@ public class Setup {
 
 		var enrollHashPath = $"EFI\\HackBGRT\\{loaderDest}";
 		var enrollKeyPath = "EFI\\HackBGRT\\certificate.cer";
-		if (skipShim) {
+		if (SkipShim) {
 			if (LoaderIsSigned) {
 				WriteLine($"Remember to enroll {enrollKeyPath} in your firmware!");
 			} else {
@@ -638,10 +654,8 @@ public class Setup {
 
 	/**
 	 * Check Secure Boot status and inform the user.
-	 *
-	 * @param allowSecureBoot Allow Secure Boot to be enabled?
 	 */
-	protected void HandleSecureBoot(bool allowSecureBoot) {
+	protected void HandleSecureBoot() {
 		int secureBoot = Efi.GetSecureBootStatus();
 		if (secureBoot == 0) {
 			WriteLine("Secure Boot is disabled, good!");
@@ -657,7 +671,7 @@ public class Setup {
 			}
 			WriteLine("Otherwise your machine may become unbootable.");
 			if (Batch) {
-				if (allowSecureBoot) {
+				if (AllowSecureBoot) {
 					return;
 				}
 				throw new SetupException("Aborting because of Secure Boot.");
@@ -681,10 +695,8 @@ public class Setup {
 
 	/**
 	 * Check BitLocker status and inform the user.
-	 *
-	 * @param allowBitLocker Allow BitLocker to be enabled?
 	 */
-	protected void HandleBitLocker(bool allowBitLocker) {
+	protected void HandleBitLocker() {
 		var output = Execute("manage-bde", "-status", true);
 		if (output == null) {
 			WriteLine("BitLocker status could not be determined.");
@@ -704,7 +716,7 @@ public class Setup {
 			WriteLine("BitLocker status is unclear. Run manage-bde -status to check.");
 		}
 		if (Batch) {
-			if (allowBitLocker) {
+			if (AllowBitLocker) {
 				return;
 			}
 			throw new SetupException("Aborting because of BitLocker.");
@@ -925,15 +937,11 @@ public class Setup {
 		if (IsHiberbootEnabled()) {
 			WriteLine("You may have to disable Fast Startup (Hiberboot) to reboot properly.");
 		}
-		bool allowSecureBoot = false;
-		bool allowBitLocker = false;
-		bool allowBadLoader = false;
-		bool skipShim = false;
 		Action<Action> verify = (Action revert) => {
 			try {
 				VerifyLoaderConfig();
 			} catch (SetupException e) {
-				if (allowBadLoader) {
+				if (AllowBadLoader) {
 					WriteLine($"Warning: {e.Message}");
 				} else {
 					WriteLine($"Error: {e.Message}");
@@ -944,25 +952,17 @@ public class Setup {
 			}
 		};
 		Action<Action, Action> enable = (Action enable, Action revert) => {
-			if (skipShim) {
-				HandleSecureBoot(allowSecureBoot);
+			if (SkipShim) {
+				HandleSecureBoot();
 			}
-			HandleBitLocker(allowBitLocker);
+			HandleBitLocker();
 			enable();
 			verify(revert);
 		};
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
 			if (arg == "install") {
-				InstallFiles(skipShim);
-			} else if (arg == "allow-secure-boot") {
-				allowSecureBoot = true;
-			} else if (arg == "allow-bitlocker") {
-				allowBitLocker = true;
-			} else if (arg == "allow-bad-loader") {
-				allowBadLoader = true;
-			} else if (arg == "skip-shim") {
-				skipShim = true;
+				InstallFiles();
 			} else if (arg == "enable-entry") {
 				enable(() => EnableEntry(), () => DisableEntry());
 			} else if (arg == "disable-entry") {
@@ -1011,14 +1011,18 @@ public class Setup {
 	protected int Run(string[] args) {
 		DryRun = args.Contains("dry-run");
 		Batch = args.Contains("batch");
-		ForwardArguments = String.Join(" ", args.Where(s => s == "dry-run" || s == "batch" || s.StartsWith("arch=")));
+		AllowBadLoader = args.Contains("allow-bad-loader");
+		AllowSecureBoot = args.Contains("allow-secure-boot");
+		AllowBitLocker = args.Contains("allow-bitlocker");
+		SkipShim = args.Contains("skip-shim");
+		ForwardArguments = String.Join(" ", args.Where(s => ForwardableArguments.Contains(s) || s.StartsWith("arch=")));
 		try {
 			SetArch(args.Where(s => s.StartsWith("arch=")).Select(s => s.Substring(5)).LastOrDefault());
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				WriteLine("This installer needs to be run as administrator!");
 				return 1;
 			}
-			var actions = args.Where(s => privilegedActions.Contains(s));
+			var actions = args.Where(s => PrivilegedActions.Contains(s));
 			if (actions.Count() > 0) {
 				RunPrivilegedActions(actions);
 				return 0;
