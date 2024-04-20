@@ -37,10 +37,10 @@ The *shim* boot loader is maintained by Red Hat, Inc, and the included signed co
 * Edit the `config.txt` and `splash.bmp` (or any other images) to your needs.
 * Run `setup.exe batch COMMANDS` as administrator, with some of the following commands:
 	* `install` – copy the files but don't enable.
-	* `enable-entry` – create a new EFI boot entry.
-	* `disable-entry` – disable the EFI boot entry.
 	* `enable-bcdedit` – use `bcdedit` to create a new EFI boot entry.
-	* `disable-bootmgr` – use `bcdedit` to disable the EFI boot entry.
+	* `disable-bcdedit` – use `bcdedit` to disable the EFI boot entry.
+	* `enable-entry` – write NVRAM to create a new EFI boot entry.
+	* `disable-entry` – write NVRAM to disable the EFI boot entry.
 	* `enable-overwrite` – overwrite the MS boot loader.
 	* `disable-overwrite` – restore the MS boot loader.
 	* `skip-shim` – skip *shim* when installing.
