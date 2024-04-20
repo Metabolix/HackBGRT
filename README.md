@@ -30,7 +30,9 @@ The *shim* boot loader is maintained by Red Hat, Inc, and the included signed co
 	* If Windows later restores the original boot loader, just reinstall.
 	* If you wish to change the image or other configuration, just reinstall.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
-	* After installing, read the instructions in [shim.md](shim.md) and reboot your computer.
+	* Read the instructions in [shim.md](shim.md).
+	* Check the common [troubleshooting](#troubleshooting) to be prepared.
+	* Reboot your computer.
 
 ### Quiet (batch) installation
 
@@ -78,9 +80,31 @@ Advanced users may edit the `config.txt` to define multiple images, in which cas
 
 If you copy an image file to ESP manually, note that the image must be a 24-bit BMP file with a 54-byte header. That's a TrueColor BMP3 in Imagemagick, or 24-bit BMP/DIB in Microsoft Paint.
 
-## Recovery
+## Troubleshooting
 
-If something breaks and you can't boot to Windows, you need to use the Windows installation disk (or recovery disk) to fix boot issues.
+### Verification failed, Security violation
+
+This is part of the setup on first boot. Make sure you have read and understood [shim.md](shim.md).
+
+### Boot is slow, boot is stuck, just spinning
+
+Sometimes the first boot is very slow (multiple minutes) for an unknown reason. Wait patiently until you get into Windows. Try to reboot at least a few times to see if it gets any better. It it does not, there's not much else to do than give up.
+
+### Image is not visible
+
+Try to remove HackBGRT and install it first with the default config and image.
+Some people report that installing another time (without first uninstalling) may also help.
+If the default logo works, try again with your custom image. Make sure that the image has a reasonable size and position and that you haven't messed up `config.txt`.
+If the default logo does not work, run the setup again and select the option to check the boot log.
+If the boot log is empty, then HackBGRT is not properly installed or you haven't properly rebooted.
+If the boot log has contents but you didn't see the logo, there is some other problem.
+You may report an issue and attach the `setup.log` file.
+
+### Impossible to boot at all
+
+If you used the default installation method, then your Windows boot loader is still in place and you should be able to access UEFI Setup ("BIOS setup") or boot loader list by some key combination right after powering on your computer. There you can choose the `Windows Boot Loader` and continue as usual to uninstall HackBGRT.
+
+If you selected the legacy installation method which overwrites Windows boot loader, then you need to use the Windows installation disk (or recovery disk) to fix boot issues.
 
 ## Building
 
