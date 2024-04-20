@@ -398,10 +398,10 @@ public class Setup {
 		if (!SkipShim) {
 			InstallFile(shimSource, loaderDest);
 			InstallFile(mmSource, $"mm{EfiArch}.efi");
+			InstallFile(loaderSource, "\u4957\u444e\u574f\u0053\u0058"); // bytes "WINDOWS\0X\0" as UTF-16
 			loaderDest = $"grub{EfiArch}.efi";
 		}
 		InstallFile(loaderSource, loaderDest);
-		InstallFile(loaderSource, "\u4957\u444e\u574f\u0053\u0058"); // bytes "WINDOWS\0X\0" as UTF-16
 		if (LoaderIsSigned) {
 			InstallFile("certificate.cer");
 		}
