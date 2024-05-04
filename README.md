@@ -90,14 +90,35 @@ This is part of the setup on first boot. Make sure you have read and understood 
 
 Sometimes the first boot is very slow (multiple minutes) for an unknown reason. Wait patiently until you get into Windows. Try to reboot at least a few times to see if it gets any better. It it does not, there's not much else to do than give up.
 
-### Image is not visible
+### Image is not visible, "nothing happens"
 
-Try to remove HackBGRT and install it first with the default config and image.
-Some people report that installing another time (without first uninstalling) may also help.
+Run the setup again and select the option to check the boot log. Continue troubleshooting according to the log contents:
+
+#### Log is empty
+
+If the log is empty, then HackBGRT is not in use. Many computers now have a security feature which causes this problem: the computer resets some settings on reboot and skips the newly-installed HackBGRT.
+
+You have to fix this manually. (After all, the security feature is specifically designed to prevent automatic changes.)
+
+1. Run the setup again.
+2. Select the option "boot to UEFI setup".
+3. After a reboot, you should get into your computer's own setup utility (UEFI or Firmware settings, or so-called "BIOS").
+4. Find boot options and the list of boot entries.
+5. Select HackBGRT as the default boot entry (before Windows Boot Loader).
+
+The setup utility is different for each computer and manufacturer, so search online for "[computer model] UEFI setup" or "firmware setup" for images and instructions.
+
+Some people report that HackBGRT is not visible in the computer settings. That's unfortunately a problem with your computer, and you should ask your computer manufacturer how to edit boot entries inside your computer settings. HackBGRT needs to boot `\EFI\HackBGRT\loader.efi`.
+
+If all else fails and you are sure about your computer skills, you can try the legacy installation method. The method bypasses this particular problem but may cause very serious problems if configured incorrectly.
+
+#### Log is not empty
+
+Try to reinstall HackBGRT with the default configuration and image.
+
 If the default logo works, try again with your custom image. Make sure that the image has a reasonable size and position and that you haven't messed up `config.txt`.
-If the default logo does not work, run the setup again and select the option to check the boot log.
-If the boot log is empty, then HackBGRT is not properly installed or you haven't properly rebooted.
-If the boot log has contents but you didn't see the logo, there is some other problem.
+
+If the default logo does not work, check the boot log again.
 You may report an issue and attach the `setup.log` file.
 
 ### Impossible to boot at all

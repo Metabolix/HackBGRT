@@ -519,7 +519,7 @@ public class Efi {
 		try {
 			var log = GetVariable("HackBGRTLog", EFI_HACKBGRT_GUID);
 			if (log.Data == null) {
-				return "(null)";
+				return "Log is empty.";
 			}
 			return new string(BytesToUInt16s(log.Data).Select(i => (char)i).ToArray());
 		} catch (Exception e) {
