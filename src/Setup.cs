@@ -1034,6 +1034,11 @@ public class Setup {
 		SkipShim = args.Contains("skip-shim");
 		ForwardArguments = String.Join(" ", args.Where(s => ForwardableArguments.Contains(s) || s.StartsWith("arch=")));
 		try {
+			if (!(Directory.Exists("efi") || Directory.Exists("efi-signed")) || !File.Exists("config.txt")) {
+				WriteLine("This setup program is not in the correct directory!");
+				WriteLine("Please extract the zip file and run the setup program from there.");
+				return 1;
+			}
 			SetArch(args.Where(s => s.StartsWith("arch=")).Select(s => s.Substring(5)).LastOrDefault());
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				WriteLine("This installer needs to be run as administrator!");
