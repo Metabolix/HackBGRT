@@ -453,7 +453,7 @@ public class Setup {
 			}
 			var guid = match.Value;
 			Execute("bcdedit", $"/set {guid} device partition={Esp.Location}", true);
-			Execute("bcdedit", $"/set {guid} path \\EFI\\HackBGRT\\loader.efi", true);
+			Execute("bcdedit", $"/set {guid} path {EfiBootEntries.OwnLoaderPath}", true);
 			foreach (var arg in new string[] { "locale", "inherit", "default", "resumeobject", "displayorder", "toolsdisplayorder", "timeout" }) {
 				Execute("bcdedit", $"/deletevalue {guid} {arg}", true);
 			}
@@ -462,9 +462,11 @@ public class Setup {
 			WriteLine("Enabled NVRAM entry for HackBGRT with BCDEdit.");
 			// Verify that the entry was created.
 			Execute("bcdedit", "/enum firmware", true);
-			Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", false, DryRun);
+			var e = new EfiBootEntries();
+			e.MakeOwnEntry(false, DryRun); // Fix load options for shim.
+			e.EnableOwnEntry(DryRun);
 			Execute("bcdedit", $"/enum {guid}", true);
-			Efi.LogBootEntries();
+			e.LogEntries();
 		} catch (Exception e) {
 			Log($"EnableBCDEdit failed: {e.ToString()}");
 			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
@@ -508,10 +510,12 @@ public class Setup {
 	 * Enable HackBGRT boot entry.
 	 */
 	protected void EnableEntry() {
-		Efi.MakeAndEnableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", true, DryRun);
+		var e = new EfiBootEntries();
+		e.MakeOwnEntry(true, DryRun);
+		e.EnableOwnEntry(DryRun);
 		WriteLine("Enabled NVRAM entry for HackBGRT.");
 		// Verify that the entry was created.
-		Efi.LogBootEntries();
+		e.LogEntries();
 		Execute("bcdedit", "/enum firmware", true);
 	}
 
@@ -519,7 +523,7 @@ public class Setup {
 	 * Disable HackBGRT boot entry.
 	 */
 	protected void DisableEntry() {
-		Efi.DisableBootEntry("HackBGRT", "\\EFI\\HackBGRT\\loader.efi", DryRun);
+		new EfiBootEntries().DisableOwnEntry(DryRun);
 		WriteLine("Disabled NVRAM entry for HackBGRT.");
 	}
 
@@ -943,7 +947,7 @@ public class Setup {
 		var bootLog = $"\n--- BOOT LOG START ---\n{Efi.GetHackBGRTLog()}\n--- BOOT LOG END ---";
 		Setup.Log(bootLog);
 		Efi.LogBGRT();
-		Efi.LogBootEntries();
+		EfiBootEntries.TryLogEntries();
 		if (GetBootTime() is DateTime bootTime) {
 			var configTime = new[] { File.GetCreationTime("config.txt"), File.GetLastWriteTime("config.txt") }.Max();
 			Log($"Boot time = {bootTime}, config.txt changed = {configTime}");
