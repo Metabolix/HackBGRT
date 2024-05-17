@@ -113,10 +113,10 @@ public class EfiBootEntries {
 		cache = new Dictionary<UInt16, (Efi.Variable, BootEntryData)>();
 		BootOrder = Efi.GetVariable("BootOrder");
 		BootCurrent = Efi.GetVariable("BootCurrent");
-		if (BootOrder.Data == null || BootCurrent.Data == null) {
-			throw new Exception("Could not read BootOrder or BootCurrent.");
+		if (BootOrder.Data == null) {
+			throw new Exception("Could not read BootOrder.");
 		}
-		BootCurrentInts = new List<UInt16>(Efi.BytesToUInt16s(BootCurrent.Data));
+		BootCurrentInts = new List<UInt16>(Efi.BytesToUInt16s(BootCurrent.Data ?? new byte[0]));
 		BootOrderInts = new List<UInt16>(Efi.BytesToUInt16s(BootOrder.Data));
 	}
 
