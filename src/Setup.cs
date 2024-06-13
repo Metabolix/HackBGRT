@@ -339,8 +339,12 @@ public class Setup {
 				g.DrawImageUnscaledAndClipped(img, new Rectangle(Point.Empty, img.Size));
 			}
 			try {
-				bmp.Save(newName, ImageFormat.Bmp);
-			} catch {
+				var ms = new MemoryStream();
+				bmp.Save(ms, ImageFormat.Bmp);
+				var bytes = ms.ToArray();
+				File.WriteAllBytes(newName, bytes);
+			} catch (Exception e) {
+				Log($"InstallImageFile failed: {e.ToString()}");
 				throw new SetupException($"Failed to install image {name} to {newName}.");
 			}
 		}
