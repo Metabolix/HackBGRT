@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.5.0 - 2024-06-21
+
+### Changed
+- Properly handle skip-shim with enable-overwrite.
+- Improve instructions (documentation).
+- Improve error reporting and logging.
+
 ## 2.4.1 - 2024-04-11
 
 ### Fixed
