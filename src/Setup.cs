@@ -13,8 +13,12 @@ using System.Runtime.CompilerServices;
 using System.Management;
 using Microsoft.Win32;
 
-[assembly: AssemblyInformationalVersionAttribute(GIT_DESCRIBE.data)]
-[assembly: AssemblyProductAttribute("HackBGRT")]
+#if GIT_DESCRIBE
+[assembly: AssemblyVersion(GIT_DESCRIBE.numeric)]
+#endif
+[assembly: AssemblyProduct("HackBGRT")]
+[assembly: AssemblyTitle("HackBGRT Installer")]
+[assembly: AssemblyDescription("HackBGRT boot logo changer for UEFI")]
 
 /**
  * HackBGRT Setup.

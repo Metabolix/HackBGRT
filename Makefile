@@ -11,7 +11,21 @@ GNUEFI_INC = gnu-efi/inc
 FILES_C = src/main.c src/util.c src/types.c src/config.c src/sbat.c src/efi.c
 FILES_H = $(wildcard src/*.h)
 FILES_CS = src/Setup.cs src/Esp.cs src/Efi.cs src/EfiBootEntries.cs
-GIT_DESCRIBE := $(firstword $(GIT_DESCRIBE) $(shell git describe --tags) unknown)
+
+# Generate version number from git describe.
+# In the numeric form, add the number of commits as the last part.
+# (Add .1 for uncommitted changes.)
+GIT_DESCRIBE := $(firstword $(GIT_DESCRIBE) $(shell git describe --tags --dirty=-1-dirty) unknown)
+GIT_DESCRIBE_PARTS := $(subst -, ,$(patsubst v%,%,$(GIT_DESCRIBE))) 0
+GIT_DESCRIBE_NUMERIC := $(firstword $(GIT_DESCRIBE_PARTS)).$(word 2,$(GIT_DESCRIBE_PARTS))
+
+define GIT_DESCRIBE_CS
+public class GIT_DESCRIBE {
+	public const string data = "$(GIT_DESCRIBE)";
+	public const string numeric = "$(GIT_DESCRIBE_NUMERIC)";
+}
+endef
+
 CFLAGS += '-DGIT_DESCRIBE_W=L"$(GIT_DESCRIBE)"' '-DGIT_DESCRIBE="$(GIT_DESCRIBE)"'
 RELEASE_NAME = HackBGRT-$(GIT_DESCRIBE:v%=%)
 
@@ -45,7 +59,7 @@ release/$(RELEASE_NAME).zip: release/$(RELEASE_NAME)
 	(cd release; 7z a -mx=9 "$(RELEASE_NAME).zip" "$(RELEASE_NAME)" -bd -bb1)
 
 src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
-	echo 'public class GIT_DESCRIBE { public const string data = "$(GIT_DESCRIBE)"; }' > $@
+	$(file > $@,$(GIT_DESCRIBE_CS))
 
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
 	csc /nologo /define:GIT_DESCRIBE /out:$@ $^
