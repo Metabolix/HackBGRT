@@ -62,7 +62,7 @@ src/GIT_DESCRIBE.cs: $(FILES_CS) $(FILES_C) $(FILES_H)
 	$(file > $@,$(GIT_DESCRIBE_CS))
 
 setup.exe: $(FILES_CS) src/GIT_DESCRIBE.cs
-	csc /nologo /define:GIT_DESCRIBE /out:$@ $^
+	csc -nologo -define:GIT_DESCRIBE -out:$@ $^
 
 certificate.cer pki:
 	@echo
