@@ -976,7 +976,7 @@ public class Setup {
 					WriteLine($"Error: {e.Message}");
 					WriteLine($"Reverting. Use batch mode with allow-bad-loader to override.");
 					revert();
-					throw new SetupException("Check your configuration and try again.");
+					throw new SetupException($"Error in configuration: {e.Message}");
 				}
 			}
 		};
