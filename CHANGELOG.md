@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.5.1 - 2024-08-18
+
+### Changed
+- Update *shim* to 15.8.
+
 ## 2.5.0 - 2024-06-21
 
 ### Changed
