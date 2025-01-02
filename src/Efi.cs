@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.ComponentModel;
 using Microsoft.Win32;
 
 /**
@@ -147,24 +148,21 @@ public class Efi {
 			if (len == buf.Length) {
 				continue;
 			}
-			if (len > 0 || Marshal.GetLastWin32Error() == 0) {
+			var error = Marshal.GetLastWin32Error();
+			const int ERROR_ENVVAR_NOT_FOUND = 0xCB;
+			if (error == ERROR_ENVVAR_NOT_FOUND) {
+				return result;
+			}
+			if (len > 0 || error == 0) {
 				result.Data = new byte[len];
 				Array.Copy(buf, 0, result.Data, 0, len);
 				return result;
 			}
-			switch (len != 0 ? 0 : Marshal.GetLastWin32Error()) {
-				case 203:
-					// Not found.
-					return result;
-				case 87:
-					throw new Exception("GetVariable: Invalid parameter");
-				case 1314:
-					throw new Exception("GetVariable: Privilege not held");
-				default:
-					throw new Exception("GetVariable: error " + Marshal.GetLastWin32Error());
-			}
+			const int ERROR_INVALID_FUNCTION = 0x1;
+			var msg = $"GetVariable: error 0x{error:X08}: ${new Win32Exception(error).Message}";
+			throw error == ERROR_INVALID_FUNCTION ? new NotImplementedException(msg) : new Exception(msg);
 		}
-		throw new Exception("GetFirmwareEnvironmentVariable: too big data");
+		throw new Exception("GetVariable: result exceeds 1MB");
 	}
 
 	/**
@@ -269,6 +267,8 @@ public class Efi {
 				return "Log is empty.";
 			}
 			return new string(BytesToUInt16s(log.Data).Select(i => (char)i).ToArray());
+		} catch (NotImplementedException e) {
+			throw e;
 		} catch (Exception e) {
 			return $"Log not found: {e.ToString()}";
 		}

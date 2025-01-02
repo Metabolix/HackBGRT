@@ -966,7 +966,14 @@ public class Setup {
 
 		InitEspPath();
 		InitEspInfo();
-		var bootLog = $"\n--- BOOT LOG START ---\n{Efi.GetHackBGRTLog()}\n--- BOOT LOG END ---";
+		Func<string> tryGetBootLog = () => {
+			try {
+				return $"\n--- BOOT LOG START ---\n{Efi.GetHackBGRTLog()}\n--- BOOT LOG END ---";
+			} catch (NotImplementedException e) {
+				throw new SetupException($"Looks like you're not booting in UEFI mode. ({e.Message})");
+			}
+		};
+		var bootLog = tryGetBootLog();
 		Setup.Log(bootLog);
 		Efi.LogBGRT();
 		EfiBootEntries.TryLogEntries();
