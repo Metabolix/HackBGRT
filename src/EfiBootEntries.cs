@@ -206,9 +206,6 @@ public class EfiBootEntries {
 	 */
 	public void MakeOwnEntry(bool alwaysCopyFromMS, bool dryRun = false) {
 		var (msNum, msVar, msEntry) = WindowsEntry;
-		if (msEntry == null) {
-			throw new Exception("MakeOwnEntry: Windows Boot Manager not found.");
-		}
 		var (ownNum, ownVar, ownEntry) = OwnEntry;
 		if (ownVar == null) {
 			(ownNum, ownVar, ownEntry) = FreeEntry;
@@ -236,6 +233,9 @@ public class EfiBootEntries {
 				ownEntry.Arguments = new byte[0];
 			}
 		} else {
+			if (msEntry == null) {
+				throw new Exception("MakeOwnEntry: Windows Boot Manager not found.");
+			}
 			ownEntry = msEntry;
 			ownEntry.Arguments = new byte[0];
 			ownEntry.Label = "HackBGRT";
