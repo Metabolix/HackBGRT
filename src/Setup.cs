@@ -1028,6 +1028,7 @@ public class Setup {
 		var self = Assembly.GetExecutingAssembly().Location;
 		Directory.SetCurrentDirectory(Path.GetDirectoryName(self));
 		WriteLine($"HackBGRT installer version: {Version}");
+		Log($"Windows version: {Environment.OSVersion}");
 		Log($"Args: {String.Join(" ", args)}");
 		Environment.ExitCode = new Setup().Run(args);
 	}
