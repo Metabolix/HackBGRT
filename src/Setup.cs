@@ -300,6 +300,9 @@ public class Setup {
 		}
 		if (Esp.Location == null && !Esp.Find() && !Esp.Mount() && !Batch) {
 			WriteLine("EFI System Partition was not found.");
+			if (Esp.MountvolESPNotSupported) {
+				WriteLine("Your computer doesn't support mountvol /S. You have to mount ESP manually.");
+			}
 			WriteLine("Press enter to exit, or give ESP path here: ");
 			string s = Console.ReadLine();
 			Log($"User input: {s}");

@@ -19,6 +19,19 @@ public sealed class Esp {
 		}
 	}
 
+	/** Output of mountvol. */
+	private static string MountvolOutput;
+
+	/** Does MountvolOutput contain /S? */
+	public static bool MountvolESPNotSupported {
+		get {
+			if (MountvolOutput == null) {
+				MountvolOutput = Setup.Execute("mountvol", "", false);
+			}
+			return MountvolOutput.Contains(" /S") == false;
+		}
+	}
+
 	/**
 	 * Constructor: do nothing.
 	 */
@@ -74,8 +87,9 @@ public sealed class Esp {
 		Setup.Log("Esp.Find()");
 		try {
 			// Match "The EFI System Partition is mounted at E:\" with some language support.
+			MountvolOutput = Setup.Execute("mountvol", "", false);
 			var re = new Regex(" EFI[^\n]*(?:\n[ \t]*)?([A-Z]:\\\\)");
-			var m = re.Match(Setup.Execute("mountvol", "", false));
+			var m = re.Match(MountvolOutput);
 			if (m.Success && TryPath(m.Groups[1].Captures[0].Value)) {
 				return true;
 			}
@@ -101,6 +115,9 @@ public sealed class Esp {
 	public static bool Mount() {
 		if (MountInstance != null) {
 			return true;
+		}
+		if (MountvolESPNotSupported) {
+			return false;
 		}
 		for (char c = 'A'; c <= 'Z'; ++c) {
 			Setup.Log($"Esp.Mount: {c}");
