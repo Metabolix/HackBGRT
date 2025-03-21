@@ -106,6 +106,9 @@ public class Setup {
 	/** @var Dry run? */
 	protected bool DryRun;
 
+	/** @var User-defined ESP path */
+	protected string UserEspPath;
+
 	/** @var Run in batch mode? */
 	protected bool Batch;
 
@@ -289,6 +292,11 @@ public class Setup {
 		if (DryRun) {
 			Directory.CreateDirectory(Path.Combine("dry-run", "EFI"));
 			Esp.TryPath("dry-run", false);
+		} else if (UserEspPath != null) {
+			WriteLine($"Using user-defined ESP path: {UserEspPath}");
+			if (!Esp.TryPath(UserEspPath, false)) {
+				throw new SetupException("The ESP path doesn't look like an EFI System Partition.");
+			}
 		}
 		if (Esp.Location == null && !Esp.Find() && !Esp.Mount() && !Batch) {
 			WriteLine("EFI System Partition was not found.");
@@ -1045,7 +1053,7 @@ public class Setup {
 		AllowSecureBoot = args.Contains("allow-secure-boot");
 		AllowBitLocker = args.Contains("allow-bitlocker");
 		SkipShim = args.Contains("skip-shim");
-		ForwardArguments = String.Join(" ", args.Where(s => ForwardableArguments.Contains(s) || s.StartsWith("arch=")));
+		ForwardArguments = String.Join(" ", args.Where(s => ForwardableArguments.Contains(s) || s.StartsWith("arch=") || s.StartsWith("esp=")));
 		try {
 			if (!(Directory.Exists("efi") || Directory.Exists("efi-signed")) || !File.Exists("config.txt")) {
 				WriteLine("This setup program is not in the correct directory!");
@@ -1053,6 +1061,7 @@ public class Setup {
 				return 1;
 			}
 			SetArch(args.Where(s => s.StartsWith("arch=")).Select(s => s.Substring(5)).LastOrDefault());
+			UserEspPath = args.Where(s => s.StartsWith("esp=")).Select(s => s.Substring(4)).LastOrDefault();
 			if (args.Contains("is-elevated") && !HasPrivileges() && !DryRun) {
 				WriteLine("This installer needs to be run as administrator!");
 				return 1;

@@ -53,6 +53,7 @@ The *shim* boot loader is maintained by Red Hat, Inc, and the included signed co
 	* `uninstall` – disable and remove completely.
 	* `show-boot-log` – show the debug log collected during boot (if `log=1` is set in `config.txt`).
 	* `arch=...` – force architecture.
+	* `esp=...` – force EFI System Partition path.
 	* `dry-run` – skip actual changes.
 * For example, run `setup.exe batch install allow-secure-boot enable-overwrite` to copy files and overwrite the MS boot loader regardless of Secure Boot status.
 
