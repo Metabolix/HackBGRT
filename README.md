@@ -71,6 +71,8 @@ If you need it for other systems as well:
 
 To install purely on Linux, you can install with `setup.exe dry-run` and then manually copy files from `dry-run/EFI` to your `[EFI System Partition]/EFI`. For further instructions, consult the documentation of your own Linux system.
 
+HackBGRT tries to read its configuration from the same directory where it's installed, so you can even make (manually) multiple installations in different directories.
+
 ## Configuration
 
 The configuration options are described in `config.txt`, which the installer copies into `[EFI System Partition]\EFI\HackBGRT\config.txt`.

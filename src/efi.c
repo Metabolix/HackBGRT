@@ -64,6 +64,33 @@ EFI_DEVICE_PATH *FileDevicePath(IN EFI_HANDLE Device OPTIONAL, IN CHAR16 *FileNa
 	return new_path;
 }
 
+CHAR16 *DevicePathToStr(EFI_DEVICE_PATH *DevPath) {
+	UINTN path_length = 0;
+	for (EFI_DEVICE_PATH *p0 = DevPath;; p0 = NextDevicePathNode(p0)) {
+		if (DevicePathType(p0) != MEDIA_DEVICE_PATH || DevicePathSubType(p0) != MEDIA_FILEPATH_DP) {
+			break;
+		}
+		path_length += DevicePathNodeLength(p0) + 1;
+	}
+
+	CHAR16* str;
+	UINTN size_str = (path_length + 1) * sizeof(*str);
+
+	if (!path_length || EFI_ERROR(BS->AllocatePool(EfiBootServicesData, size_str, (void**)&str))) {
+		return 0;
+	}
+
+	UINTN pos = 0;
+	for (EFI_DEVICE_PATH *p0 = DevPath; pos < path_length; p0 = NextDevicePathNode(p0)) {
+		FILEPATH_DEVICE_PATH *f = (FILEPATH_DEVICE_PATH *) p0;
+		BS->CopyMem(str + pos, f->PathName, StrLen(f->PathName) * sizeof(*str));
+		pos += DevicePathNodeLength(p0) + 1;
+		str[pos - 1] = L'\\';
+	}
+	str[pos - 1] = 0;
+	return str;
+}
+
 INTN CompareMem(IN CONST VOID *Dest, IN CONST VOID *Src, IN UINTN len) {
 	CONST UINT8 *d = Dest, *s = Src;
 	for (UINTN i = 0; i < len; ++i) {

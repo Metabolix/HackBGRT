@@ -439,16 +439,39 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 		goto fail;
 	}
 
-	EFI_FILE_HANDLE base_dir;
-	if (EFI_ERROR(root_dir->Open(root_dir, &base_dir, L"\\EFI\\HackBGRT", EFI_FILE_MODE_READ, 0))) {
-		Log(config.debug, L"Failed to HackBGRT directory.\n");
-		base_dir = root_dir;
+	CHAR16* default_dir_path = L"\\EFI\\HackBGRT";
+	Log(config.debug, L"Default directory: %s\n", default_dir_path);
+	EFI_FILE_HANDLE default_dir;
+	if (EFI_ERROR(root_dir->Open(root_dir, &default_dir, default_dir_path, EFI_FILE_MODE_READ, 0))) {
+		Log(config.debug, L"Failed to open HackBGRT default directory.\n");
+		default_dir = root_dir;
 	}
+
+	CHAR16* working_dir_path = DevicePathToStr(image->FilePath);
+	for (int i = StrLen(working_dir_path), skipped_last_component = 0; i--;) {
+		if (working_dir_path[i] == L'/' || working_dir_path[i] == L'\\') {
+			working_dir_path[i] = skipped_last_component++ ? L'\\' : L'\0';
+		}
+	}
+	Log(config.debug, L"Working directory: %s\n", working_dir_path);
+	EFI_FILE_HANDLE working_dir;
+	if (EFI_ERROR(root_dir->Open(root_dir, &working_dir, working_dir_path, EFI_FILE_MODE_READ, 0))) {
+		Log(config.debug, L"Failed to open HackBGRT working directory.\n");
+		working_dir = default_dir;
+	}
+
+	EFI_FILE_HANDLE base_dir = working_dir;
 
 	EFI_SHELL_PARAMETERS_PROTOCOL *shell_param_proto = NULL;
 	if (EFI_ERROR(BS->OpenProtocol(image_handle, TmpGuidPtr((EFI_GUID) EFI_SHELL_PARAMETERS_PROTOCOL_GUID), (void**) &shell_param_proto, 0, 0, EFI_OPEN_PROTOCOL_GET_PROTOCOL)) || shell_param_proto->Argc <= 1) {
 		const CHAR16* config_path = L"config.txt";
+		retry_read_config:
 		if (!ReadConfigFile(&config, base_dir, config_path)) {
+			if (base_dir != default_dir && StrCmp(default_dir_path, working_dir_path) != 0) {
+				base_dir = default_dir;
+				Log(config.debug, L"Trying the default directory.\n");
+				goto retry_read_config;
+			}
 			Log(1, L"No config, no command line!\n", config_path);
 			goto fail;
 		}
