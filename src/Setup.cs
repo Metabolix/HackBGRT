@@ -455,12 +455,12 @@ public class Setup {
 		}
 		var bcdeditEnum = Execute("bcdedit", "/enum firmware");
 		if (bcdeditEnum.ExitCode != 0) {
-			WriteLine("BCDEdit is not working. Fix it or try another method.");
 			if (bcdeditEnum.Output != null) {
-				var lastLine = bcdeditEnum.Output.Split("\n".ToCharArray()).Last();
-				WriteLine($"BCDEdit output: {lastLine}");
-				WriteLine("Disable antivirus, check your hard disk, or search 'how to fix 0x800703EE'.");
+				var lines = bcdeditEnum.Output.Split("\n".ToCharArray());
+				var lastLine = lines.Select(s => s != "").Last();
+				WriteLine($"BCDEdit failed with: {lastLine}");
 			}
+			WriteLine("BCDEdit failed. See README for further information.");
 			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
 		}
 		try {

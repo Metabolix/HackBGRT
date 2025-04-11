@@ -85,6 +85,10 @@ If you copy an image file to ESP manually, note that the image must be a 24-bit 
 
 ## Troubleshooting
 
+### BCDEdit failed
+
+You can first try the other installation option in the menu. If it doesn't work either, your computer might have a problem. Open Command Prompt and figure out why `bcdedit /enum firmware` fails. In some cases, disabling antivirus, checking the hard disk or searching for 'how to fix 0x800703EE' may help.
+
 ### Verification failed, Security violation
 
 This is part of the setup on first boot. Make sure you have read and understood [shim.md](shim.md).
