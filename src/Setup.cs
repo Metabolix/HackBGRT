@@ -298,7 +298,7 @@ public class Setup {
 				throw new SetupException("The ESP path doesn't look like an EFI System Partition.");
 			}
 		}
-		if (Esp.Location == null && !Esp.Find() && !Esp.Mount() && !Batch) {
+		if (!Esp.FindOrMount() && !Batch) {
 			WriteLine("EFI System Partition was not found.");
 			if (Esp.MountvolESPNotSupported) {
 				WriteLine("Your computer doesn't support mountvol /S. You have to mount ESP manually.");
@@ -317,6 +317,9 @@ public class Setup {
 			throw new SetupException("EFI System Partition was not found.");
 		}
 		WriteLine($"EFI System Partition location is {Esp.Location}");
+		if (Esp.Location.StartsWith("C:")) {
+			WriteLine("Warning: EFI System Partition is not normally C: drive.");
+		}
 	}
 
 	/**

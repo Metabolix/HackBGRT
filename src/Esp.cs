@@ -22,6 +22,9 @@ public sealed class Esp {
 	/** Output of mountvol. */
 	private static string MountvolOutput;
 
+	/** Possible drive letter for the ESP. */
+	public static string DriveLetters = "ABZYXWVUTSRQPONMLKJIHGFEDC";
+
 	/** Does MountvolOutput contain /S? */
 	public static bool MountvolESPNotSupported {
 		get {
@@ -80,11 +83,17 @@ public sealed class Esp {
 	 *
 	 * @return true if the drive was found.
 	 */
-	public static bool Find() {
-		if (MountInstance != null) {
-			return true;
-		}
-		Setup.Log("Esp.Find()");
+	public static bool FindOrMount() {
+		return Location != null || FindWithMountvol() || Mount() || TryAllDrives();
+	}
+
+	/**
+	 * Find the EFI System Partition, if it's already mounted.
+	 *
+	 * @return true if the drive was found.
+	 */
+	private static bool FindWithMountvol() {
+		Setup.Log("Esp: Detect from mountvol output.");
 		try {
 			// Match "The EFI System Partition is mounted at E:\" with some language support.
 			MountvolOutput = Setup.Execute("mountvol", "", false);
@@ -93,17 +102,29 @@ public sealed class Esp {
 			if (m.Success && TryPath(m.Groups[1].Captures[0].Value)) {
 				return true;
 			}
-			Setup.Log("Esp.Find: no match");
+			Setup.Log("Esp: no match");
 		} catch (Exception e) {
-			Setup.Log($"Esp.Find: {e.ToString()}");
+			Setup.Log($"Esp: {e.ToString()}");
 		}
-		for (char c = 'A'; c <= 'Z'; ++c) {
+		return false;
+	}
+
+	/**
+	 * Try all drive letters to find the EFI System Partition.
+	 *
+	 * @return true if the drive was found.
+	 */
+	private static bool TryAllDrives() {
+		Setup.Log("Esp: Detect by trying all drive letters.");
+		foreach (char c in DriveLetters) {
 			if (TryPath(c + ":\\")) {
-				Setup.Log($"Esp.Find: found {c}");
+				Setup.Log($"Esp: found {c}");
+				if (c == 'C') {
+					Setup.Log("Esp: WARNING: It's unlikely that C: is really the ESP.");
+				}
 				return true;
 			}
 		}
-		Setup.Log("Esp.Find: not found");
 		return false;
 	}
 
@@ -112,14 +133,15 @@ public sealed class Esp {
 	 *
 	 * @return true if the drive was mounted, false otherwise.
 	 */
-	public static bool Mount() {
-		if (MountInstance != null) {
-			return true;
-		}
+	private static bool Mount() {
 		if (MountvolESPNotSupported) {
 			return false;
 		}
-		for (char c = 'A'; c <= 'Z'; ++c) {
+		Setup.Log("Esp: Try to mount with mountvol.");
+		foreach (char c in DriveLetters) {
+			if (Directory.Exists(c + ":\\")) {
+				continue;
+			}
 			Setup.Log($"Esp.Mount: {c}");
 			if (Setup.Execute("mountvol", c + ": /S", true) != null) {
 				MountInstance = new Esp();
