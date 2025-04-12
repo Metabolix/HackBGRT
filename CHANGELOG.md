@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.5.2 - 2025-04-13
+
+### Fixed
+- Try to avoid mistaking C: for ESP.
+- Don't require Windows boot loader entry if it's not needed.
+
+### Changed
+- Allow overriding ESP path.
+- Try to load `config.txt` from the current dir, to support multiple configurations.
+- Improve output and README for various situations.
+
 ## 2.5.1 - 2024-08-18
 
 ### Changed
