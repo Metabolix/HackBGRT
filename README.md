@@ -99,11 +99,11 @@ Sometimes the first boot is very slow (multiple minutes) for an unknown reason. 
 
 ### Image is not visible, "nothing happens"
 
-Run the setup again and select the option to check the boot log. Continue troubleshooting according to the log contents:
+Run the setup again and select the option to check the boot log, marked with `BOOT LOG START` in the log file. Continue troubleshooting according to the log contents:
 
-#### Log is empty
+#### Boot log is empty
 
-If the log is empty, then HackBGRT is not in use. Many computers now have a security feature which causes this problem: the computer resets some settings on reboot and skips the newly-installed HackBGRT.
+If the log is empty, then HackBGRT is not in use. Many computers now have a security feature which causes this problem: the computer prevents enabling HackBGRT automatically, instead it resets a certain setting (BootOrder) on reboot and skips the newly-installed HackBGRT.
 
 You have to fix this manually. (After all, the security feature is specifically designed to prevent automatic changes.)
 
@@ -119,13 +119,15 @@ Some people report that HackBGRT is not visible in the computer settings. That's
 
 If all else fails and you are sure about your computer skills, you can try the legacy installation method. The method bypasses this particular problem but may cause very serious problems if configured incorrectly.
 
-#### Log is not empty
+#### Boot log is not empty
 
-Try to reinstall HackBGRT with the default configuration and image.
+If the log shows that HackBGRT has been run during boot, the problem is usually in your configuration file or image. Try to reinstall HackBGRT with the default configuration and image.
 
-If the default logo works, try again with your custom image. Make sure that the image has a reasonable size and position and that you haven't messed up `config.txt`.
+If the default logo works, try again with your custom image. Make sure that the image has a reasonable size and position so that it fits the resolution which HackBGRT reports during boot. The resolution may be lower than your desktop resolution.
 
-If the default logo does not work, check the boot log again.
+When you get your image working with the default configuration, you can do any other necessary changes to `config.txt`.
+
+If the default logo does not work, check the boot log again to see if there is some obvious error.
 You may report an issue and attach the `setup.log` file.
 
 ### Impossible to boot at all

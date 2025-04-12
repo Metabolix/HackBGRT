@@ -91,6 +91,16 @@ public class EfiBootEntries {
 	}
 
 	/**
+	 * Status of the own boot entry.
+	 */
+	public enum OwnEntryStatus {
+		NotFound,
+		Disabled,
+		EnabledAfterWindows,
+		Enabled
+	}
+
+	/**
 	 * Path to the Windows boot loader.
 	 */
 	public const string WindowsLoaderPath = "\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
@@ -171,6 +181,26 @@ public class EfiBootEntries {
 	 */
 	public (UInt16, Efi.Variable, BootEntryData) FreeEntry {
 		get { return FindEntry(null); }
+	}
+
+	/**
+	 * Check if the own entry is enabled.
+	 */
+	public OwnEntryStatus GetOwnEntryStatus() {
+		var (ownNum, ownVar, _) = OwnEntry;
+		if (ownVar == null) {
+			return OwnEntryStatus.NotFound;
+		}
+		var (msNum, _, _) = WindowsEntry;
+		var msPos = BootOrderInts.IndexOf(msNum);
+		var ownPos = BootOrderInts.IndexOf(ownNum);
+		if (ownPos < 0) {
+			return OwnEntryStatus.Disabled;
+		}
+		if (ownPos < msPos || msPos < 0) {
+			return OwnEntryStatus.Enabled;
+		}
+		return OwnEntryStatus.EnabledAfterWindows;
 	}
 
 	/**
@@ -293,17 +323,6 @@ public class EfiBootEntries {
 			if (e != null) {
 				Setup.Log($"LogEntries: {v}");
 			}
-		}
-	}
-
-	/**
-	 * Try to log the boot entries.
-	 */
-	public static void TryLogEntries() {
-		try {
-			new EfiBootEntries().LogEntries();
-		} catch (Exception e) {
-			Setup.Log($"LogEntries failed: {e.ToString()}");
 		}
 	}
 }

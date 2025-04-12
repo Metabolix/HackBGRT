@@ -264,13 +264,13 @@ public class Efi {
 		try {
 			var log = GetVariable("HackBGRTLog", EFI_HACKBGRT_GUID);
 			if (log.Data == null) {
-				return "Log is empty.";
+				return "Boot log is empty.";
 			}
 			return new string(BytesToUInt16s(log.Data).Select(i => (char)i).ToArray());
 		} catch (NotImplementedException e) {
 			throw e;
 		} catch (Exception e) {
-			return $"Log not found: {e.ToString()}";
+			return $"Boot log not found: {e.ToString()}";
 		}
 	}
 

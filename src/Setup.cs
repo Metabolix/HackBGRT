@@ -482,13 +482,12 @@ public class Setup {
 			var fwbootmgr = "{fwbootmgr}";
 			Execute("bcdedit", $"/set {fwbootmgr} displayorder {guid} /addfirst", true);
 			WriteLine("Enabled NVRAM entry for HackBGRT with BCDEdit.");
-			// Verify that the entry was created.
-			Execute("bcdedit", "/enum firmware", true);
+
+			Execute("bcdedit", $"/enum {guid}", true);
 			var e = new EfiBootEntries();
 			e.MakeOwnEntry(false, DryRun); // Fix load options for shim.
 			e.EnableOwnEntry(DryRun);
 			Execute("bcdedit", $"/enum {guid}", true);
-			e.LogEntries();
 		} catch (Exception e) {
 			Log($"EnableBCDEdit failed: {e.ToString()}");
 			throw new SetupException("Failed to enable HackBGRT with BCDEdit!");
@@ -536,9 +535,6 @@ public class Setup {
 		e.MakeOwnEntry(true, DryRun);
 		e.EnableOwnEntry(DryRun);
 		WriteLine("Enabled NVRAM entry for HackBGRT.");
-		// Verify that the entry was created.
-		e.LogEntries();
-		Execute("bcdedit", "/enum firmware", true);
 	}
 
 	/**
@@ -547,6 +543,27 @@ public class Setup {
 	protected void DisableEntry() {
 		new EfiBootEntries().DisableOwnEntry(DryRun);
 		WriteLine("Disabled NVRAM entry for HackBGRT.");
+	}
+
+	/**
+	 * Log boot entries and report the status of HackBGRT boot entry.
+	 */
+	public void CheckEntries() {
+		try {
+			var efiBootEntries = new EfiBootEntries();
+			efiBootEntries.LogEntries();
+			var entryStatusText = efiBootEntries.GetOwnEntryStatus() switch {
+				EfiBootEntries.OwnEntryStatus.NotFound => "missing",
+				EfiBootEntries.OwnEntryStatus.Disabled => "disabled (not in BootOrder)",
+				EfiBootEntries.OwnEntryStatus.EnabledAfterWindows => "disabled (after Windows in BootOrder)",
+				EfiBootEntries.OwnEntryStatus.Enabled => "enabled correctly",
+				_ => throw new SetupException("Unknown HackBGRT boot entry status!")
+			};
+			WriteLine($"HackBGRT boot entry is {entryStatusText}.");
+		} catch (Exception e) {
+			WriteLine($"Failed to check EFI boot entries: {e.Message}");
+			Setup.Log(e.ToString());
+		}
 	}
 
 	/**
@@ -975,8 +992,10 @@ public class Setup {
 		};
 		var bootLog = tryGetBootLog();
 		Setup.Log(bootLog);
+
 		Efi.LogBGRT();
-		EfiBootEntries.TryLogEntries();
+		CheckEntries();
+
 		if (GetBootTime() is DateTime bootTime) {
 			var configTime = new[] { File.GetCreationTime("config.txt"), File.GetLastWriteTime("config.txt") }.Max();
 			Log($"Boot time = {bootTime}, config.txt changed = {configTime}");
@@ -1008,6 +1027,8 @@ public class Setup {
 			HandleBitLocker();
 			enable();
 			verify(revert);
+			CheckEntries();
+			Execute("bcdedit", "/enum firmware", true);
 		};
 		foreach (var arg in actions) {
 			Log($"Running action '{arg}'.");
@@ -1033,6 +1054,7 @@ public class Setup {
 				BootToFW();
 			} else if (arg == "show-boot-log") {
 				WriteLine(bootLog);
+				CheckEntries();
 			} else {
 				throw new SetupException($"Invalid action: '{arg}'!");
 			}
