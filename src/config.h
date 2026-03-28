@@ -6,15 +6,47 @@
  * Possible actions to perform on the BGRT.
  */
 enum HackBGRT_action {
-	HackBGRT_KEEP = 0, HackBGRT_REPLACE, HackBGRT_REMOVE
+	HackBGRT_ACTION_KEEP = 0,
+	HackBGRT_ACTION_REPLACE,
+	HackBGRT_ACTION_REMOVE
 };
 
 /**
  * Special values for the image coordinates.
  * @see struct HackBGRT_config
  */
-enum HackBGRT_coordinate {
-	HackBGRT_coord_keep = -1000001
+enum HackBGRT_coordinate_mode {
+	HackBGRT_COORDINATE_MODE_KEEP = 0,
+	HackBGRT_COORDINATE_MODE_CENTERED,
+	HackBGRT_COORDINATE_MODE_FRACTION,
+};
+
+/**
+ * Constants for the fractional coordinates.
+ */
+enum HackBGRT_fraction {
+	HackBGRT_FRACTION_DIGITS = 4,
+	HackBGRT_FRACTION_ONE = 10000,
+	HackBGRT_FRACTION_HALF = 5000,
+	HackBGRT_FRACTION_381966011 = 3820,
+};
+
+/**
+ * Possible values for the orientation.
+ */
+enum HackBGRT_orientation {
+	HackBGRT_ORIENTATION_KEEP = -1,
+};
+
+/**
+ * The configuration for one image.
+ */
+struct HackBGRT_image_config {
+	enum HackBGRT_action action;
+	const CHAR16* path;
+	enum HackBGRT_coordinate_mode x_mode, y_mode;
+	int x, y;
+	int orientation;
 };
 
 /**
@@ -22,12 +54,8 @@ enum HackBGRT_coordinate {
  */
 struct HackBGRT_config {
 	int debug, log;
-	enum HackBGRT_action action;
-	const CHAR16* image_path;
-	int image_x;
-	int image_y;
+	struct HackBGRT_image_config image;
 	int image_weight_sum;
-	int orientation;
 	int resolution_x;
 	int resolution_y;
 	int old_resolution_x;

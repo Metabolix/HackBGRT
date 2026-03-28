@@ -21,7 +21,6 @@ EFI_RUNTIME_SERVICES *RT;
  */
 static struct HackBGRT_config config = {
 	.log = 1,
-	.action = HackBGRT_KEEP,
 };
 
 /**
@@ -163,13 +162,13 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 			}
 			Log(config.debug, L" - ACPI table @%x: %s, revision = %d, OEM ID = %s\n", (UINTN)entry, TmpStr(entry->signature, 4), entry->revision, TmpStr(entry->oem_id, 6));
 			switch (action) {
-				case HackBGRT_KEEP:
+				case HackBGRT_ACTION_KEEP:
 					if (!bgrt) {
 						Log(config.debug, L" -> Returning this one for later use.\n");
 						bgrt = (ACPI_BGRT*) entry;
 					}
 					break;
-				case HackBGRT_REMOVE:
+				case HackBGRT_ACTION_REMOVE:
 					Log(config.debug, L" -> Deleting.\n");
 					for (int k = j+1; k < entry_arr_length; ++k) {
 						entry_arr[k-1] = entry_arr[k];
@@ -179,13 +178,13 @@ static ACPI_BGRT* HandleAcpiTables(enum HackBGRT_action action, ACPI_BGRT* bgrt)
 					xsdt->length -= sizeof(entry_arr[0]);
 					--j;
 					break;
-				case HackBGRT_REPLACE:
+				case HackBGRT_ACTION_REPLACE:
 					Log(config.debug, L" -> Replacing.\n");
 					entry_arr[j] = (UINTN) bgrt;
 			}
 			bgrt_count += 1;
 		}
-		if (!bgrt_count && action == HackBGRT_REPLACE && bgrt) {
+		if (!bgrt_count && action == HackBGRT_ACTION_REPLACE && bgrt) {
 			Log(config.debug, L" - Adding missing BGRT.\n");
 			xsdt = CreateXsdt(xsdt, entry_arr_length + 1);
 			entry_arr = (UINT64*)&xsdt[1];
@@ -303,13 +302,13 @@ static void CropBMP(BMP* bmp, int w, int h) {
  */
 void HackBgrt(EFI_FILE_HANDLE base_dir) {
 	// REMOVE: simply delete all BGRT entries.
-	if (config.action == HackBGRT_REMOVE) {
-		HandleAcpiTables(config.action, 0);
+	if (config.image.action == HackBGRT_ACTION_REMOVE) {
+		HandleAcpiTables(config.image.action, 0);
 		return;
 	}
 
 	// KEEP/REPLACE: first get the old BGRT entry.
-	ACPI_BGRT* bgrt = HandleAcpiTables(HackBGRT_KEEP, 0);
+	ACPI_BGRT* bgrt = HandleAcpiTables(HackBGRT_ACTION_KEEP, 0);
 
 	// Get the old BMP and position (relative to screen center), if possible.
 	const int old_valid = bgrt && VerifyAcpiSdtChecksum(bgrt);
@@ -324,7 +323,7 @@ void HackBgrt(EFI_FILE_HANDLE base_dir) {
 	// Missing BGRT?
 	if (!bgrt) {
 		// Keep missing = do nothing.
-		if (config.action == HackBGRT_KEEP) {
+		if (config.image.action == HackBGRT_ACTION_KEEP) {
 			return;
 		}
 		// Replace missing = allocate new.
@@ -351,13 +350,13 @@ void HackBgrt(EFI_FILE_HANDLE base_dir) {
 
 	// Get the image (either old or new).
 	BMP* new_bmp = old_bmp;
-	if (config.action == HackBGRT_REPLACE) {
-		new_bmp = LoadBMP(base_dir, config.image_path);
+	if (config.image.action == HackBGRT_ACTION_REPLACE) {
+		new_bmp = LoadBMP(base_dir, config.image.path);
 	}
 
 	// No image = no need for BGRT.
 	if (!new_bmp) {
-		HandleAcpiTables(HackBGRT_REMOVE, 0);
+		HandleAcpiTables(HackBGRT_ACTION_REMOVE, 0);
 		return;
 	}
 
@@ -366,15 +365,22 @@ void HackBgrt(EFI_FILE_HANDLE base_dir) {
 
 	// Set the image address and orientation.
 	bgrt->image_address = (UINTN) new_bmp;
-	const int new_orientation = config.orientation == HackBGRT_coord_keep ? old_orientation : ((config.orientation / 90) & 3);
+	const int new_orientation = config.image.orientation == HackBGRT_ORIENTATION_KEEP ? old_orientation : config.image.orientation;
 	bgrt->status = new_orientation << 1;
 
 	// New center coordinates.
-	const int new_x = config.image_x == HackBGRT_coord_keep ? old_x : config.image_x;
-	const int new_y = config.image_y == HackBGRT_coord_keep ? old_y : config.image_y;
 	const int new_swap = new_orientation & 1;
 	const int new_reso_x = new_swap ? config.resolution_y : config.resolution_x;
 	const int new_reso_y = new_swap ? config.resolution_x : config.resolution_y;
+
+	const int new_x =
+		config.image.x_mode == HackBGRT_COORDINATE_MODE_KEEP ? old_x :
+		config.image.x_mode == HackBGRT_COORDINATE_MODE_CENTERED ? config.image.x :
+		(config.image.x - HackBGRT_FRACTION_HALF) * new_reso_x / HackBGRT_FRACTION_ONE;
+	const int new_y =
+		config.image.y_mode == HackBGRT_COORDINATE_MODE_KEEP ? old_y :
+		config.image.y_mode == HackBGRT_COORDINATE_MODE_CENTERED ? config.image.y :
+		(config.image.y - HackBGRT_FRACTION_HALF) * new_reso_y / HackBGRT_FRACTION_ONE;
 
 	// Calculate absolute position.
 	const int max_x = new_reso_x - new_bmp->width;
@@ -383,15 +389,17 @@ void HackBgrt(EFI_FILE_HANDLE base_dir) {
 	bgrt->image_offset_y = max(0, min(max_y, new_y + (new_reso_y - new_bmp->height) / 2));
 
 	Log(config.debug,
-		L"BMP at (%d, %d), center (%d, %d), resolution (%d, %d), orientation %d.\n",
+		L"Screen %dx%d, BMP %dx%d, center (%d, %d) = corner (%d, %d), orientation %d.\n",
+		new_reso_x, new_reso_y,
+		new_bmp->width, new_bmp->height,
+		new_x, new_y,
 		(int) bgrt->image_offset_x, (int) bgrt->image_offset_y,
-		new_x, new_y, new_reso_x, new_reso_y,
 		new_orientation * 90
 	);
 
 	// Store this BGRT in the ACPI tables.
 	SetAcpiSdtChecksum(bgrt);
-	HandleAcpiTables(HackBGRT_REPLACE, bgrt);
+	HandleAcpiTables(HackBGRT_ACTION_REPLACE, bgrt);
 }
 
 /**

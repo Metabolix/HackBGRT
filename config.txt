@@ -8,12 +8,13 @@ boot=MS
 # Multiple image lines may be present, in which case one will be picked by random.
 # The image line may contain the following parts:
 # Any of the following:
-#  - "n=(number)", a weight for this image in the randomization process. Default: n=1.
-#  - "x=(number)" or "x=keep", the x offset from the center. Default: x=0.
-#  - "y=(number)" or "y=keep", the y offset from the center. Default: y=0.
-#  - "o=(0|90|180|270|keep)", the screen orientation, degrees anticlockwise. Default: o=keep.
+#  - "x=(number) y=(number)" positions the image relative to the screen center.
+#  - "x=.(decimal) y=.(decimal)" positions the image as a fraction of the resolution.
+#  - "o=(0|90|180|270|keep)", the screen orientation, degrees anticlockwise.
+#  - "n=(number)", a weight for this image in the randomization process.
+#  - Default values: o=keep x=.5 y=.382 n=1
 # One of the following:
-#  - "keep" to keep the firmware logo. Also keeps coordinates by default.
+#  - "keep" to keep the firmware logo (and coordinates, unless specified).
 #  - "remove" to remove the BGRT. Makes x and y meaningless.
 #  - "black" to use only a black image. Makes x and y meaningless.
 #  - "path=file.bmp" to read an image file.
@@ -21,9 +22,9 @@ boot=MS
 # Examples:
 #  - image=remove
 #  - image=black
-#  - image= x=0 y=-200 path=topimage.bmp
+#  - image= x=0 y=.0 path=topimage.bmp
 #  - image= n=1 o=90 path=sideways.bmp
-#  - image= n=50 y=999999 o=keep path=probable.bmp
+#  - image= n=50 y=999999 path=probable.bmp
 # The above examples together would produce
 #  - 1/54 chance for the default OS logo
 #  - 1/54 chance for black screen
@@ -31,7 +32,7 @@ boot=MS
 #  - 1/54 chance for splash.bmp, centered, orientation set to 90 degrees
 #  - 50/54 chance for probable.bmp, at the bottom edge, explicitly default orientation
 # Default: just one image.
-image= y=-200 path=splash.bmp
+image= path=splash.bmp
 
 # Preferred resolution. Use 0x0 for maximum and -1x-1 for original.
 resolution=0x0

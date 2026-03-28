@@ -68,54 +68,89 @@ BOOLEAN ReadConfigFile(struct HackBGRT_config* config, EFI_FILE_HANDLE base_dir,
 	return TRUE;
 }
 
-static void SetBMPWithRandom(struct HackBGRT_config* config, int weight, enum HackBGRT_action action, int x, int y, int o, const CHAR16* path) {
+static void SetBMPWithRandom(struct HackBGRT_config* config, const struct HackBGRT_image_config* image, int weight) {
 	config->image_weight_sum += weight;
 	UINT32 random = (((UINT64) Random() & 0xffffffff) * config->image_weight_sum) >> 32;
 	UINT32 limit = ((UINT64) 0xffffffff * weight) >> 32;
-	Log(config->debug, L"%s n=%d, action=%d, x=%d, y=%d, o=%d, path=%s, rand=%x/%x\n", random <= limit ? L"Using" : L"Skipping", weight, action, x, y, o, path, random, limit);
+	Log(
+		config->debug,
+		L"image n=%d, action=%d, x=%d (mode %d), y=%d (mode %d), o=%d, path=%s, rand=%x/%x, chosen=%d\n",
+		weight, image->action, image->x, image->x_mode, image->y, image->y_mode, image->orientation, image->path, random, limit, (random <= limit)
+	);
 	if (random <= limit) {
-		config->action = action;
-		config->image_path = path;
-		config->orientation = o;
-		config->image_x = x;
-		config->image_y = y;
+		config->image = *image;
 	}
 }
 
-static int ParseCoordinate(const CHAR16* str, enum HackBGRT_action action) {
-	if (str && ((L'0' <= str[0] && str[0] <= L'9') || str[0] == L'-')) {
-		return str[0] == L'-' ? -(int)Atoi(str+1) : (int)Atoi(str);
+static void ParseCoordinate(const CHAR16* str, int* out_int, enum HackBGRT_coordinate_mode* out_mode) {
+	if (!str) {
+		return;
 	}
-	if ((str && StrnCmp(str, L"keep", 4) == 0) || action == HackBGRT_KEEP) {
-		return HackBGRT_coord_keep;
+	if (StrnCmp(str, L"keep", 4) == 0) {
+		*out_int = 0;
+		*out_mode = HackBGRT_COORDINATE_MODE_KEEP;
+		return;
 	}
-	return 0;
+	if (str[0] == L'.' && L'0' <= str[1] && str[1] <= L'9') {
+		int result = 0, i = 1, length = 0;
+		for (length = 0; length < HackBGRT_FRACTION_DIGITS; ++length) {
+			result = 10 * result;
+			if (L'0' <= str[i] && str[i] <= L'9') {
+				result += str[i] - L'0';
+				i += 1;
+			}
+		}
+		*out_mode = HackBGRT_COORDINATE_MODE_FRACTION;
+		*out_int = result;
+		return;
+	}
+	int neg = str[0] == L'-' ? 1 : 0;
+	if (L'0' <= str[neg] && str[neg] <= L'9') {
+		*out_int = Atoi(str + neg) * (neg ? -1 : 1);
+		*out_mode = HackBGRT_COORDINATE_MODE_CENTERED;
+		return;
+	}
 }
 
 static void ReadConfigImage(struct HackBGRT_config* config, const CHAR16* line) {
-	const CHAR16* n = StrStrAfter(line, L"n=");
-	const CHAR16* x = StrStrAfter(line, L"x=");
-	const CHAR16* y = StrStrAfter(line, L"y=");
-	const CHAR16* o = StrStrAfter(line, L"o=");
-	const CHAR16* f = StrStrAfter(line, L"path=");
-	enum HackBGRT_action action = HackBGRT_KEEP;
-	if (f) {
-		action = HackBGRT_REPLACE;
+	struct HackBGRT_image_config image = {
+		.action = HackBGRT_ACTION_KEEP,
+		.orientation = HackBGRT_ORIENTATION_KEEP,
+	};
+	const CHAR16* tmp;
+	image.path = StrStrAfter(line, L"path=");
+	if (image.path) {
+		image.action = HackBGRT_ACTION_REPLACE;
+		// Default: x centered, y 38.2 % (= 1 - 1 / golden_ratio)
+		image.x_mode = image.y_mode = HackBGRT_COORDINATE_MODE_FRACTION;
+		image.x = HackBGRT_FRACTION_HALF;
+		image.y = HackBGRT_FRACTION_381966011;
 	} else if (StrStr(line, L"remove")) {
-		action = HackBGRT_REMOVE;
+		image.action = HackBGRT_ACTION_REMOVE;
 	} else if (StrStr(line, L"black")) {
-		action = HackBGRT_REPLACE;
+		image.action = HackBGRT_ACTION_REPLACE;
+		image.path = 0;
 	} else if (StrStr(line, L"keep")) {
-		action = HackBGRT_KEEP;
+		image.action = HackBGRT_ACTION_KEEP;
+		image.x_mode = image.y_mode = HackBGRT_COORDINATE_MODE_KEEP;
 	} else {
 		Log(1, L"Invalid image line: %s\n", line);
 		return;
 	}
-	int weight = n && (!f || n < f) ? Atoi(n) : 1;
-	int x_val = ParseCoordinate(x, action);
-	int y_val = ParseCoordinate(y, action);
-	int o_val = o ? ParseCoordinate(o, action) : HackBGRT_coord_keep;
-	SetBMPWithRandom(config, weight, action, x_val, y_val, o_val, f);
+	ParseCoordinate(StrStrAfter(line, L"x="), &image.x, &image.x_mode);
+	ParseCoordinate(StrStrAfter(line, L"y="), &image.y, &image.y_mode);
+	if (StrStrAfter(line, L"o=keep")) {
+		image.orientation = HackBGRT_ORIENTATION_KEEP;
+	} else if ((tmp = StrStrAfter(line, L"o="))) {
+		// convert orientation in degrees to number 0-3 (* 90 degrees)
+		int i = tmp[0] == L'-' ? -(int)Atoi(tmp+1) : (int)Atoi(tmp);
+		image.orientation = (i / 90) & 3;
+	}
+	int weight = 1;
+	if ((tmp = StrStrAfter(line, L"n="))) {
+		weight = Atoi(tmp);
+	}
+	SetBMPWithRandom(config, &image, weight);
 }
 
 static void ReadConfigResolution(struct HackBGRT_config* config, const CHAR16* line) {
