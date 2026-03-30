@@ -12,19 +12,30 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 
 **Important:** If you mess up the installation, your system may become unbootable! Create a rescue disk before use. This software comes with no warranty. Use at your own risk.
 
-* Make sure that your computer is booting with UEFI.
-* Make sure that you have read the Secure Boot instructions.
-* Make sure that BitLocker is disabled, or find your recovery key.
-
-### Secure Boot instructions
+### Secure Boot
 
 HackBGRT is not approved by Microsoft. Instead, HackBGRT comes with the *shim* boot loader, which allows to manually select HackBGRT as a trusted program. After installing HackBGRT and rebooting your computer, you have to **follow the instructions in [shim.md](shim.md)** to achieve this. These steps cannot be automated, that's the whole point of Secure Boot. Although HackBGRT is self-signed with a certificate, it's not advisable to enroll foreign certificates directly into your firmware.
 
 The *shim* boot loader is maintained by Red Hat, Inc, and the included signed copy of *shim* is extracted from Debian GNU/Linux – many thanks to the maintainers! For copyright information, see [shim-signed/COPYRIGHT](shim-signed/COPYRIGHT).
 
+### TPM
+
+TPM, or Trusted Platform Module, watches how your computer boots. When there is a change in the boot process – such as using HackBGRT – some things may stop working. This includes:
+
+* BitLocker or similar disk encryption.
+* Anti-cheat software.
+* Windows PIN unlock method.
+* Other security-related things which mention TPM.
+
+You should disable these features before using HackBGRT. Some of them can be re-enabled afterwards, some can't. For any TPM problems, it's recommended to either uninstall HackBGRT or stop using the problematic feature.
+
+(If you find an easy way to reconfigure the TPM, please document, test and share it. Technically one solution would be to install HackBGRT before Windows and make sure that Windows is always booted through HackBGRT. But that's easier said than done.)
+
 ### Windows installation
 
+* Make sure you **read the above sections**.
 * Get the latest release from the Releases page.
+* Make sure you have only one bootable hard drive. Otherwise the automatic setup may fail.
 * Start `setup.exe` and follow the instructions.
 	* The installer will launch Paint for editing the image, or you can edit it otherwise.
 	* For advanced settings, edit `config.txt` before installing. No extra support provided!
@@ -75,7 +86,7 @@ HackBGRT tries to read its configuration from the same directory where it's inst
 
 ## Configuration
 
-The configuration options are described in `config.txt`, which the installer copies into `[EFI System Partition]\EFI\HackBGRT\config.txt`.
+The configuration options are described in `config.txt`, which the installer copies into `[EFI System Partition]\EFI\HackBGRT\config.txt`. For debugging purposes, the same options may be given also as command line parameters in the EFI Shell.
 
 ## Images
 
