@@ -16,7 +16,7 @@ When booting on a UEFI-based computer, Windows may show a vendor-defined logo wh
 
 HackBGRT is not approved by Microsoft. Instead, HackBGRT comes with the *shim* boot loader, which allows to manually select HackBGRT as a trusted program. After installing HackBGRT and rebooting your computer, you have to **follow the instructions in [shim.md](shim.md)** to achieve this. These steps cannot be automated, that's the whole point of Secure Boot. Although HackBGRT is self-signed with a certificate, it's not advisable to enroll foreign certificates directly into your firmware.
 
-The *shim* boot loader is maintained by Red Hat, Inc, and the included signed copy of *shim* is extracted from Debian GNU/Linux – many thanks to the maintainers! For copyright information, see [shim-signed/COPYRIGHT](shim-signed/COPYRIGHT).
+The *shim* boot loader is maintained by Red Hat, Inc, and the included signed copies of *shim* are extracted from various Linux distributions – many thanks to the maintainers! For copyright information, see [shim-signed/COPYRIGHT](shim-signed/COPYRIGHT).
 
 ### TPM
 
