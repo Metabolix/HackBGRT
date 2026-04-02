@@ -71,6 +71,7 @@ public class Setup {
 		"disable",
 		"uninstall",
 		"boot-to-fw",
+		"ask-to-boot-to-fw",
 		"show-boot-log",
 	};
 
@@ -814,6 +815,26 @@ public class Setup {
 	}
 
 	/**
+	 * Ask if the user wants to boot to the UEFI setup.
+	 */
+	protected void AskToBootToFW() {
+		WriteLine();
+		WriteLine("Sometimes HackBGRT needs to be enabled manually in the UEFI setup.");
+		WriteLine("You can do that now, or later if you notice that HackBGRT isn't working.");
+		WriteLine("Find 'Boot options' or something similar and move HackBGRT before Windows.");
+		if (!Efi.CanBootToFW()) {
+			return;
+		}
+		WriteLine("Do you want to reboot and enter the UEFI setup now? (Y/N)");
+		var k = Console.ReadKey().Key;
+		Log($"User input: {k}");
+		WriteLine();
+		if (k == ConsoleKey.Y) {
+			BootToFW();
+		}
+	}
+
+	/**
 	 * Detect the EFI architecture.
 	 */
 	protected static string DetectArchFromOS() {
@@ -935,9 +956,9 @@ public class Setup {
 			Configure();
 		}
 		if (k == ConsoleKey.I) {
-			RunPrivilegedActions(new string[] { "disable", "install", "enable-bcdedit" });
+			RunPrivilegedActions(new string[] { "disable", "install", "enable-bcdedit", "ask-to-boot-to-fw" });
 		} else if (k == ConsoleKey.J) {
-			RunPrivilegedActions(new string[] { "disable", "install", "enable-entry" });
+			RunPrivilegedActions(new string[] { "disable", "install", "enable-entry", "ask-to-boot-to-fw" });
 		} else if (k == ConsoleKey.O) {
 			RunPrivilegedActions(new string[] { "disable", "install", "enable-overwrite" });
 		} else if (k == ConsoleKey.F) {
@@ -1050,6 +1071,8 @@ public class Setup {
 				Disable();
 			} else if (arg == "uninstall") {
 				Uninstall();
+			} else if (arg == "ask-to-boot-to-fw") {
+				AskToBootToFW();
 			} else if (arg == "boot-to-fw") {
 				BootToFW();
 			} else if (arg == "show-boot-log") {
