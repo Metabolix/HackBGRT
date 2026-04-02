@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.6.0 - 2026-04-02
+
+### Added
+- Allow setting image position as a fraction of resolution.
+
+### Changed
+- Update *shim* to 16.1 for x86_64 and Aarch64.
+- Rename `setup.log` to `setup-log.txt` for easier use.
+
 ## 2.5.2 - 2025-04-13
 
 ### Fixed
