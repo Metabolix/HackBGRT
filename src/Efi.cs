@@ -35,6 +35,9 @@ public class Efi {
 	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern UInt32 GetSystemFirmwareTable(UInt32 provider, UInt32 table, [MarshalAs(UnmanagedType.LPArray)] byte[] buffer, UInt32 len);
 
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern void SetLastError(UInt32 errorCode);
+
 	[StructLayout(LayoutKind.Sequential, Pack = 1)]
 	private struct TokPriv1Luid {
 		public int Count;
@@ -144,6 +147,7 @@ public class Efi {
 
 		for (UInt32 i = 4096; i <= 1024*1024; i *= 2) {
 			byte[] buf = new byte[i];
+			SetLastError(0);
 			UInt32 len = GetFirmwareEnvironmentVariableEx(name, guid, buf, (UInt32) buf.Length, out result.Attributes);
 			if (len == buf.Length) {
 				continue;
@@ -159,7 +163,7 @@ public class Efi {
 				return result;
 			}
 			const int ERROR_INVALID_FUNCTION = 0x1;
-			var msg = $"GetVariable: error 0x{error:X08}: ${new Win32Exception(error).Message}";
+			var msg = $"GetVariable: error 0x{error:X08}: {new Win32Exception(error).Message}";
 			throw error == ERROR_INVALID_FUNCTION ? new NotImplementedException(msg) : new Exception(msg);
 		}
 		throw new Exception("GetVariable: result exceeds 1MB");
