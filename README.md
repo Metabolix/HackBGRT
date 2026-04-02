@@ -141,7 +141,7 @@ If the default logo works, try again with your custom image. Make sure that the 
 When you get your image working with the default configuration, you can do any other necessary changes to `config.txt`.
 
 If the default logo does not work, check the boot log again to see if there is some obvious error.
-You may report an issue and attach the `setup.log` file.
+You may report an issue and attach the `setup-log.txt` file.
 
 ### Impossible to boot at all
 

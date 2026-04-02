@@ -142,7 +142,7 @@ public class Setup {
 		var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
 		var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
 		var prefix = $"{timestamp} | pid {pid} | ";
-		File.AppendAllText("setup.log", prefix + s.Replace("\n", "\n" + prefix) + "\n");
+		File.AppendAllText("setup-log.txt", prefix + s.Replace("\n", "\n" + prefix) + "\n");
 	}
 
 	/**
@@ -1137,7 +1137,7 @@ public class Setup {
 				WriteLine("This was a dry run, your system was not actually modified.");
 			}
 			if (!Batch) {
-				WriteLine("If you need to report a bug,\n - run this setup again with menu option L (show-boot-log)\n - then include the setup.log file with your report.");
+				WriteLine("If you need to report a bug,\n - run this setup again with menu option L (show-boot-log)\n - then include the setup-log.txt file with your report.");
 				WriteLine("Press any key to quit.");
 				Console.ReadKey();
 			}

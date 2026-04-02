@@ -18,4 +18,4 @@ Explain exactly the steps you did:
 4. ...
 
 **Log file**
-Run the setup again and select menu option `L` (or add parameter `show-boot-log` on command line). Attach the `setup.log` to this report.
+Run the setup again and select menu option `L` (or add parameter `show-boot-log` on command line). Attach the `setup-log.txt` to this report.
